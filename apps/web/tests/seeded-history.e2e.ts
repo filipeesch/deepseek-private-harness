@@ -770,7 +770,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await compareOrRefreshGolden(COMMAND_ROW_EXPECTED, snapshot, MODE)
   }, 60_000)
 
-  it.skipIf(MODE === 'record')('reports full feedback correlation ids in an expandable two-line row', async () => {
+  it.skipIf(MODE === 'record')('reports the feedback acknowledgement naming the session in a single-line row', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-feedback-row'))
     const previousDshHome = process.env.DSH_HOME
     process.env.DSH_HOME = scaffold.harnessHome
@@ -782,10 +782,8 @@ describe('web e2e: seeded history renders through cold resume', () => {
         hasText: `Feedback recorded for session ${SEED_ID}`,
       })
       await row.waitFor({ timeout: 10_000 })
-      const disclosure = row.locator('[data-expandable]')
-      expect(await disclosure.getAttribute('aria-expanded')).toBe('false')
-      await disclosure.click()
-      await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
+      // The acknowledgement is one line, so the row has nothing to expand.
+      expect(await row.locator('[data-expandable]').count()).toBe(0)
 
       const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
       if (agent === undefined) throw new Error('seeded session did not attach an agent')

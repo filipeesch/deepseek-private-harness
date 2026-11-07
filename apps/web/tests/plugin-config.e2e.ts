@@ -182,7 +182,7 @@ describe('web e2e: plugin configuration pages', () => {
     expect(await panel.getByRole('link', { name: '网页搜索与获取指南', exact: true }).getAttribute('href'))
       .toBe('https://api-docs.deepseek.com/zh-cn/guides/search')
     // Each section shows the description its selected provider registered with the Host, in the active language.
-    expect(await searchSection.getByText('直接请求搜索接口返回标题、URL 与摘要，无需额外调用模型。使用当前会话的 DeepSeek 账号或 DeepSeek API Key，可能产生计费', { exact: true }).count()).toBe(1)
+    expect(await searchSection.getByText('直接请求搜索接口返回标题、URL 与摘要，无需额外调用模型。使用 DeepSeek API Key，可能产生计费', { exact: true }).count()).toBe(1)
     expect(await fetchSection.getByText('本机直接请求，免 API Key 与计费，可访问内网和本机。仅解码 HTML、JSON 等文本，不执行 JavaScript、不带登录态，不支持 PDF；也可以试试 DeepSeek Fetch API', { exact: true }).count()).toBe(1)
     // The Fetch API suggestion is text, not an action.
     expect(await fetchSection.getByRole('button').count()).toBe(1)
@@ -200,7 +200,7 @@ describe('web e2e: plugin configuration pages', () => {
 
     // The Fetch API takes no settings here, so its section shows no panel.
     await choose(fetchMenu, 'DeepSeek Fetch API')
-    expect(await fetchSection.getByText('由 DeepSeek 服务端抓取公网页面并返回 Markdown。使用当前会话的 DeepSeek 账号或 DeepSeek API Key，可能产生计费，且无法访问内网和本机', { exact: true }).count()).toBe(1)
+    expect(await fetchSection.getByText('由 DeepSeek 服务端抓取公网页面并返回 Markdown。使用 DeepSeek API Key，可能产生计费，且无法访问内网和本机', { exact: true }).count()).toBe(1)
     expect(await fetchSection.getByRole('textbox').count()).toBe(0)
     expect(await fetchSection.getByRole('button').count()).toBe(1)
     await save.click()
