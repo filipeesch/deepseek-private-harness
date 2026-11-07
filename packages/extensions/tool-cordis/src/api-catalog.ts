@@ -7052,7 +7052,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelCatalog',
-    declaration: 'export interface ModelCatalog {\n    readonly default?: ModelSelection;\n    readonly routableProviders: readonly string[];\n    readonly groups: readonly ModelProviderGroup[];\n    readonly failures: readonly ModelCatalogFailure[];\n}',
+    declaration: 'export interface ModelCatalog {\n    readonly default: ModelSelection;\n    readonly routableProviders: readonly string[];\n    readonly groups: readonly ModelProviderGroup[];\n    readonly failures: readonly ModelCatalogFailure[];\n}',
   },
   {
     name: 'ModelCatalogFailure',
