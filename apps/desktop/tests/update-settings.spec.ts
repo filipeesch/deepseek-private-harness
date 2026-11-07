@@ -2,7 +2,6 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, onTestFinished, vi } from 'vitest'
-import { readDesktopSettings } from '../src/settings.ts'
 import { DesktopUpdateSettings } from '../src/update-settings.ts'
 import { DesktopSettingsFile, DesktopSettingsFileError } from '../src/settings-file.ts'
 
@@ -49,19 +48,6 @@ it('reports unreadable configuration instead of silently choosing a default', as
   const settings = await fixture()
   await mkdir(settings.path)
   expect(await settings.load()).toMatchObject({ kind: 'error', error: { problem: { kind: 'read' } } })
-})
-
-it('updates the document initialized by shell settings without losing the popup preference', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'desktop-shared-settings-'))
-  onTestFinished(() => rm(root, { recursive: true, force: true }))
-  expect((await readDesktopSettings(root)).updates.allowTestAuthPopupWindow).toBe(false)
-  const settings = new DesktopUpdateSettings(root, 'stable')
-  await settings.save('nightly')
-  expect(JSON.parse(await readFile(settings.path, 'utf8'))).toEqual({
-    updates: { allowTestAuthPopupWindow: false, channel: 'nightly' },
-  })
-  expect((await readDesktopSettings(root)).updates.allowTestAuthPopupWindow).toBe(false)
-  expect(await settings.load()).toEqual({ kind: 'ready', channel: 'nightly' })
 })
 
 // Storage has already classified the write; the channel consumer must not retry it.

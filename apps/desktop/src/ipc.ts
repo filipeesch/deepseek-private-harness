@@ -20,8 +20,6 @@ export const DESKTOP_IPC = {
   shortcutsRecording: 'dsh-desktop:shortcuts-recording',
   boot: 'dsh-desktop:boot',
   enterWorkspace: 'dsh-desktop:enter-workspace',
-  onboardingActive: 'dsh-desktop:onboarding-active',
-  onboardingApiKey: 'dsh-desktop:onboarding-api-key',
   bootFailed: 'dsh-desktop:boot-failed',
   browserAcquire: 'dsh-desktop:browser-acquire',
   browserRelease: 'dsh-desktop:browser-release',
@@ -31,7 +29,6 @@ export const DESKTOP_IPC = {
   fileDragCancel: 'dsh-desktop:file-drag-cancel',
   fileDragStart: 'dsh-desktop:file-drag-start',
   fileDragRelease: 'dsh-desktop:file-drag-release',
-  deviceInfo: 'dsh-desktop:device-info',
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
   localeChanged: 'dsh-desktop:locale-changed',
   updatesChannelGet: 'dsh-desktop:updates-channel-get',
@@ -97,11 +94,6 @@ export interface DshDesktopProductApi {
   readonly fileDrag: DesktopFileDrag
   readonly keyboard: DesktopKeyboardApi
   readonly shortcuts: DesktopShortcutsApi
-  /**
-   * Local machine description for the feedback questionnaire.
-   * @returns `name=value` fields separated by `; `, with no hostname, user name, or serial number.
-   */
-  deviceInfo(): Promise<string>
   readonly updates: {
     readonly channels: DesktopChannelBridge
     status(): Promise<DesktopUpdatePresentation>

@@ -30,11 +30,11 @@
   en: 605d60c0cb4658ae
   zh: 3d1e8bf0cf7775c0
 /desktop-packaging/unsigned-windows-test-installer:
-  en: f429bc0c280e2dfa
-  zh: 4adbcc9e906bdf80
+  en: 63a34d41ebdfcf05
+  zh: 5f9a83d7f7dfb572
 /desktop-packaging/local-macos-dmg-without-release-signing:
-  en: 1146bbc11be43960
-  zh: 7c13543a0513c059
+  en: a196b4eb271705c6
+  zh: db9e1287cbf984e2
 /desktop-packaging/macos-release-signing-and-diagnostics:
   en: a0b4aa1080ecf6fb
   zh: 37d4b8934f89bee8

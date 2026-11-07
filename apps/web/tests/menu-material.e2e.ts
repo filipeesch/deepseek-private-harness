@@ -67,7 +67,7 @@ it('shares menu transparency and blur across palettes and follows native menu bo
     Object.defineProperty(globalThis, 'dshDesktop', { value: { protocolVersion: 1 } })
   })
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-  const account = page.getByRole('button', { name: 'Account menu', exact: true })
+  const account = page.getByRole('button', { name: 'Settings', exact: true })
   await account.waitFor()
 
   const results: Record<string, Awaited<ReturnType<typeof material>>> = {}

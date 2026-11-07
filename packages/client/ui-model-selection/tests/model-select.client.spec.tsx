@@ -10,7 +10,7 @@ import type { ComponentProps } from 'react'
 import type { OwnerOf } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelDirectoryState } from '../src/client/directory.ts'
 import { ModelSelect } from '../src/client/ModelSelect.tsx'
-import { en, zh } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 
 // The seat's key domain is model ∪ common; the stub mirrors the real lookup
@@ -1073,8 +1073,8 @@ it('hides the inherited effort until a listed model is selected', async () => {
 })
 
 
-it('places account and official models before third-party models', async () => {
-  const groups = ['custom', 'deepseek-official', 'deepseek-account', 'another'].map(id => ({
+it('places official models before third-party models', () => {
+  const groups = ['custom', 'deepseek-official', 'another'].map(id => ({
     id, name: id, models: [1, 2].map(index => ({ id: `${id}-${index}`, name: `${id}-${index}` })),
   }))
   const directory = createSnapshotStore<ModelDirectoryState>(state({ current: null, groups }))
@@ -1082,32 +1082,15 @@ it('places account and official models before third-party models', async () => {
     resolveText={resolveText} select={vi.fn()} t={t} />)
   fireEvent.click(screen.getByRole('button', { name: '请选择模型' }))
   const names = screen.getAllByRole('menuitemradio').map(row => row.textContent)
-  expect(names).toEqual([
-    'deepseek-account-1', 'deepseek-account-2', 'deepseek-official-1', 'deepseek-official-2',
-    'custom-1', 'custom-2', 'another-1', 'another-2',
-  ])
-  expect(groups.map(group => group.id)).toEqual(['custom', 'deepseek-official', 'deepseek-account', 'another'])
-  await expect(`${names.join('\n')}\n`).toMatchFileSnapshot('./expected/account-first.txt')
+  expect(names).toEqual(['deepseek-official-1', 'deepseek-official-2', 'custom-1', 'custom-2', 'another-1', 'another-2'])
+  expect(groups.map(group => group.id)).toEqual(['custom', 'deepseek-official', 'another'])
 })
 
-it.each([en, zh])('localizes the account group while preserving external names', (copy) => {
-  const groups = ['deepseek-account', 'custom'].map(id => ({
-    id, name: id === 'deepseek-account' ? 'DeepSeek Account' : 'My Gateway',
-    models: [{ id: 'model', name: 'Model' }],
-  }))
-  render(<ModelSelect renderSlot={renderLabel} locked={false} available
-    directory={createSnapshotStore(state({ current: null, groups }))}
-    load={vi.fn()} resolveText={resolveText} select={vi.fn()} t={key => key in copy ? copy[key as keyof typeof copy] : key} />)
-  fireEvent.click(screen.getByRole('button', { name: copy['trigger.selectAria'] }))
-  expect(screen.getByRole('group', { name: copy['provider.account'] })).toBeTruthy()
-  expect(screen.getByRole('group', { name: 'My Gateway' })).toBeTruthy()
-})
-
-it('restores the account model name after login without changing the saved route', () => {
-  const groups = [{ id: 'deepseek-account', name: 'DeepSeek Account', models: [
+it('keeps a saved route visible when its provider is unavailable and restores it when the provider returns', () => {
+  const groups = [{ id: 'deepseek-official', name: 'DeepSeek Official', models: [
     { id: 'deepseek-flash', name: 'DeepSeek Flash', reasoning },
   ] }]
-  const selected = { provider: 'deepseek-account', model: 'deepseek-flash', reasoningEffort: 'high' }
+  const selected = { provider: 'deepseek-official', model: 'deepseek-flash', reasoningEffort: 'high' }
   const directory = createSnapshotStore(state({ current: selected, groups, retainedEffort: 'High' }))
   render(<ModelSelect renderSlot={renderLabel} locked={false} available directory={directory} load={vi.fn()}
     resolveText={resolveText} select={vi.fn()} t={t} />)
@@ -1118,7 +1101,6 @@ it('restores the account model name after login without changing the saved route
   expect(screen.getByRole('button', { name: /选择模型，当前/ }).textContent).toBe('DeepSeek FlashHigh')
   expect(directory.getSnapshot().current).toEqual(selected)
 })
-
 
 it('dismisses contributed options with focus on the trigger before opening another overlay', () => {
   const renderSlot = vi.fn((_name: string, _owner: object) => null)

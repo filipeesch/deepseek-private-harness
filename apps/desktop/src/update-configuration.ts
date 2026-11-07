@@ -11,7 +11,7 @@ import type { DesktopMessages } from './locale.ts'
 export function configurationFailure(error: DesktopSettingsFileError): NonNullable<DesktopChannelState['error']> {
   const problem = error.problem
   if (problem.kind !== 'invalid') return 'read'
-  return problem.reason === 'field' && problem.field === 'channel' ? 'channel' : 'format'
+  return problem.reason === 'field' ? 'channel' : 'format'
 }
 
 /**

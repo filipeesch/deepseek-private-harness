@@ -9,20 +9,8 @@ import { WebError } from '@deepseek-ai/dsh-web'
 
 const USER_AGENT = 'deepseek-harness/0.0.1'
 
-/** Account token tried before the API key of an operation. */
-interface DeepSeekWebAccountAuth {
-  /** API base the token is sent to, including its path prefix. */
-  baseURL: string
-  /** Resolve the token the account releases for a dispatch endpoint; undefined or empty selects the API key. */
-  resolveToken: (endpoint: string) => Promise<string | undefined>
-  /** Invalidate the exact token rejected by HTTP 401; failures must not replace the request error. */
-  rejectToken: (token: string) => Promise<void>
-}
-
 /** Authentication values resolved once for an operation. */
 export interface DeepSeekWebAuth {
-  /** Account token sent to its own base when released; otherwise the API key is sent to the request's base. */
-  account?: DeepSeekWebAccountAuth
   /** Literal API key; takes precedence over the credential resolver. */
   apiKey?: string
   /** Resolve the current API key without retaining it. */
@@ -33,16 +21,14 @@ export interface DeepSeekWebAuth {
   missingKeyMessage?: string
   /**
    * A mounted model route the operation depends on and whose settings do not resolve. The operation fails with
-   * `WEB_PROVIDER_MISCONFIGURED` and {@link DeepSeekWebInvalidRoute.message} at the stage that would use the route,
-   * before resolving its credential or sending anything.
+   * `WEB_PROVIDER_MISCONFIGURED` and {@link DeepSeekWebInvalidRoute.message} where the API key would be resolved,
+   * before resolving the credential or sending anything.
    */
   invalidRoute?: DeepSeekWebInvalidRoute
 }
 
-/** A model route whose settings do not resolve, and the stage of an operation that needs it. */
+/** A model route whose settings do not resolve. */
 interface DeepSeekWebInvalidRoute {
-  /** `account` fails before the account token is read; `api-key` fails where the API key would be resolved. */
-  stage: 'account' | 'api-key'
   /** Model-facing diagnostic naming the route and its recoveries. */
   message: string
 }
@@ -71,7 +57,7 @@ interface DeepSeekWebRequest<T> {
   body: object
   /** Protocol headers without credentials. */
   headers?: Readonly<Record<string, string>>
-  /** Additional API-key headers; not applied to account tokens. */
+  /** Additional API-key headers. */
   apiKeyHeaders?: (key: string) => Readonly<Record<string, string>>
   /** Validate and project the response. */
   decode: (payload: unknown) => T
@@ -89,7 +75,7 @@ interface DeepSeekWebRequest<T> {
  * @returns Whether a literal key or resolver is present.
  */
 export function hasDeepSeekWebCredential(auth: DeepSeekWebAuth): boolean {
-  return (auth.apiKey?.length ?? 0) > 0 || auth.resolveApiKey !== undefined || auth.account !== undefined
+  return (auth.apiKey?.length ?? 0) > 0 || auth.resolveApiKey !== undefined
 }
 
 /** Narrow a remote JSON object.
@@ -107,16 +93,12 @@ export function invalidResponse(): WebError {
   return new WebError('DeepSeek returned an invalid response body', 'WEB_PROVIDER_ERROR')
 }
 
-/** Authentication headers and endpoint for one operation, tagged by the credential that produced them. */
+/** Authentication headers and endpoint for one operation. */
 interface SearchAuth {
-  /** `account` for a DeepSeek account token, `api-key` for an API key. */
-  readonly kind: 'account' | 'api-key'
-  /** Absolute dispatch URL under the base of the credential. */
+  /** Absolute dispatch URL under the request's base. */
   readonly endpoint: string
   /** Headers carrying the credential. */
   readonly headers: Readonly<Record<string, string>>
-  /** Request-bound invalidation, present only when an account token was sent. */
-  readonly reject?: () => Promise<void>
 }
 
 /** Dispatch one operation using a single settings and credential snapshot.
@@ -181,15 +163,6 @@ export async function dispatchDeepSeekWeb<T>(
       // malformed/non-JSON error body (normal for gateway 5xx/429s) can only
       // cost a richer provider message, never the real error.
     }
-    // The account service released this token only for its inference
-    // origin, so the endpoint is not what the user must change.
-    if (status === 401 && auth.kind === 'account') {
-      // Invalidation can cancel this Session; finish reading the HTTP failure before it does. A cancelled read still
-      // invalidates the token the status rejected.
-      try { await auth.reject?.() }
-      catch (_credentialRemovalFailed) { /* Report the original failure even if credential removal fails. */ }
-      throw aborted ?? accountRejectedError(message)
-    }
     if (aborted !== undefined) throw aborted
     throw searchEndpointError(guidance, endpoint, message)
   }
@@ -206,15 +179,6 @@ export async function dispatchDeepSeekWeb<T>(
       : `DeepSeek returned an unprocessable response body: ${String(error)}`
     throw searchEndpointError(guidance, endpoint, message, error)
   }
-}
-
-/** Replace endpoint guidance with sign-in guidance when DeepSeek rejects the account token. */
-function accountRejectedError(message: string): WebError {
-  return new WebError(
-    `${message}\n\nDeepSeek rejected the account sign-in used for this web request. `
-    + 'Guide the user to sign in to DeepSeek again; the endpoint does not need changing.',
-    'WEB_PROVIDER_ERROR',
-  )
 }
 
 /**
@@ -248,27 +212,16 @@ function searchEndpointError(
 /**
  * Resolve one operation's authentication headers without retaining a credential on the provider.
  * @param options - the caller's snapshot, so the credential and the endpoint it is sent to come from one section.
- * @param request - the resolved request; its path under the account base scopes the account token.
+ * @param request - the resolved request.
  * @param signal - abort signal for the surrounding operation.
- * @returns the account-token header and account endpoint when a token resolves, otherwise the API-key headers and the
- *   request's endpoint, tagged by credential kind.
+ * @returns the API-key headers and the request's endpoint.
  */
 async function authHeaders(
   options: DeepSeekWebAuth, request: DeepSeekWebRequest<unknown>, signal?: AbortSignal,
 ): Promise<SearchAuth> {
-  const { account, invalidRoute } = options
-  if (invalidRoute?.stage === 'account') throw routeMisconfigured(invalidRoute)
-  if (account !== undefined) {
-    const endpoint = joinPath(account.baseURL, request.path)
-    const token = await resolveCredential(() => account.resolveToken(endpoint), signal)
-    if (token !== undefined && token.length > 0) return {
-      kind: 'account', endpoint, headers: { 'x-dsh-auth-token': token },
-      reject: async () => { await account.rejectToken(token) },
-    }
-  }
-  if (invalidRoute?.stage === 'api-key') throw routeMisconfigured(invalidRoute)
+  if (options.invalidRoute !== undefined) throw routeMisconfigured(options.invalidRoute)
   const apiKey = await resolveApiKey(options, signal)
-  return { kind: 'api-key', endpoint: joinPath(request.baseURL, request.path), headers: {
+  return { endpoint: joinPath(request.baseURL, request.path), headers: {
     ...request.apiKeyHeaders?.(apiKey),
     'authorization': `Bearer ${apiKey}`,
   } }

@@ -117,11 +117,6 @@
     - id: authorization
       name: '@deepseek-ai/dsh-authorization'
 
-    - id: deepseek-account
-      name: '@deepseek-ai/dsh-deepseek-account-platform'
-      config:
-        desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' && ['darwin', 'win32'].includes(process.platform) ? process.platform : null"
-
     - id: credentials
       name: '@deepseek-ai/dsh-credentials-local'
 
@@ -464,14 +459,12 @@
     # preset; products with a stricter network policy override tool-web. Search
     # defaults to the DeepSeek Search API (deepseek-search-api) and fetch to the
     # anonymous local fetcher (http). The DeepSeek Search and Fetch APIs
-    # (deepseek-search-api, deepseek-fetch-api) follow the conversation: on the
-    # deepseek-account route they send the account token to that route's
-    # origin, and otherwise the API key of the DeepSeek API-key route to its
-    # origin, so a DEEPSEEK_API_KEY alone serves both without a sign-in.
+    # (deepseek-search-api, deepseek-fetch-api) send the API key of the DeepSeek
+    # API-key route to that route's origin, so a DEEPSEEK_API_KEY alone serves both.
     # searchBaseURL / searchApiKeyEnv (fetch* for Fetch) pin one capability to
     # its own endpoint and key instead.
     # Legacy Messages search (deepseek-official) is selectable separately and
-    # uses its own endpoint, with the account token or DEEPSEEK_API_KEY.
+    # uses its own endpoint, with DEEPSEEK_API_KEY.
     # Anonymous fetch accepts only public
     # HTTP(S) destinations, resolves and validates every destination, and pins
     # every actual connection. This composition gives web_search 60s whichever
@@ -543,6 +536,3 @@
     # choice.
     - id: llm-deepseek
       name: '@deepseek-ai/dsh-llm-deepseek-api-key'
-
-    - id: llm-deepseek-account
-      name: '@deepseek-ai/dsh-llm-deepseek-account'

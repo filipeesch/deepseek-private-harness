@@ -11,8 +11,12 @@
     "src/types.ts"
   ],
   "references": [
-    { "path": "../../team/agent-team" },
-    { "path": "../../client/product-analytics/tsconfig.client.json" },
+    {
+      "path": "../../team/agent-team"
+    },
+    {
+      "path": "../../client/product-analytics/tsconfig.client.json"
+    },
     {
       "path": "../../../vendor/cordis"
     },
@@ -111,12 +115,6 @@
     },
     {
       "path": "../../document/office-to-pdf"
-    },
-    {
-      "path": "../account-controller"
-    },
-    {
-      "path": "../../credentials/deepseek-account"
     },
     {
       "path": "../../web/web"

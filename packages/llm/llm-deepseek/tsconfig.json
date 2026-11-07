@@ -8,8 +8,9 @@
     "src"
   ],
   "references": [
-    { "path": "../../credentials/credentials" },
-    { "path": "../../credentials/deepseek-account" },
+    {
+      "path": "../../credentials/credentials"
+    },
     {
       "path": "../../../vendor/cosmokit"
     },

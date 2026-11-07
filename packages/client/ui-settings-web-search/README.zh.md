@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-在侧栏打开**插件**，在官方分组里选择**网页搜索与获取**，即可选择网页搜索和网页获取使用的提供方、设置 Search API 的结果数，或配置旧版 Messages 搜索。DeepSeek Search 与 Fetch API 在这里没有凭据设置：它们使用会话的 DeepSeek 账号或 DeepSeek API Key。页面只在保存时写入；旧版搜索的密钥经凭据域写入。页面在 Host 服务 `web` 命名空间期间存在；各官方提供方的控件只在 Host 服务该提供方命名空间时显示。
+在侧栏打开**插件**，在官方分组里选择**网页搜索与获取**，即可选择网页搜索和网页获取使用的提供方、设置 Search API 的结果数，或配置旧版 Messages 搜索。DeepSeek Search 与 Fetch API 在这里没有凭据设置：它们使用 DeepSeek API Key。页面只在保存时写入；旧版搜索的密钥经凭据域写入。页面在 Host 服务 `web` 命名空间期间存在；各官方提供方的控件只在 Host 服务该提供方命名空间时显示。
 
 ## 目录
 
