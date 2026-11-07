@@ -1,7 +1,6 @@
 /**
  * Real Loader composition: the DeepSeek model routes, the web seam, and this plugin boot from a `cordis.yml`, so the
- * API-key endpoint and key come from the route entries the Loader activated. Only the network and the account service
- * are stubbed.
+ * API-key endpoint and key come from the route entries the Loader activated. Only the network is stubbed.
  */
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -10,10 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import { boot } from '@deepseek-ai/dsh-app-boot'
-import type { DeepSeekAccount } from '@deepseek-ai/dsh-deepseek-account'
 import { createLaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
-import * as Account from '@deepseek-ai/dsh-llm-deepseek-account'
 import * as Official from '@deepseek-ai/dsh-llm-deepseek-api-key'
 import WebRuntime from '@deepseek-ai/dsh-web'
 import * as webApiPlugin from '@deepseek-ai/dsh-web-deepseek-api'
@@ -28,7 +25,6 @@ afterEach(async () => {
 const MODULES = new Map<string, unknown>([
   ['@deepseek-ai/dsh-llm', LlmRuntime],
   ['@deepseek-ai/dsh-llm-deepseek-api-key', Official],
-  ['@deepseek-ai/dsh-llm-deepseek-account', Account],
   ['@deepseek-ai/dsh-web', WebRuntime],
   ['@deepseek-ai/dsh-web-deepseek-api', webApiPlugin],
 ])
@@ -65,7 +61,6 @@ async function bootComposition(web: Record<string, unknown>, environment: Record
   await writeFile(configPath, JSON.stringify([
     { id: 'llm', name: '@deepseek-ai/dsh-llm' },
     { id: 'llm-deepseek', name: '@deepseek-ai/dsh-llm-deepseek-api-key' },
-    { id: 'llm-deepseek-account', name: '@deepseek-ai/dsh-llm-deepseek-account' },
     { id: 'web', name: '@deepseek-ai/dsh-web', config: { searchProvider: 'deepseek-search-api', fetchProvider: 'deepseek-fetch-api' } },
     { id: 'web-deepseek-api', name: '@deepseek-ai/dsh-web-deepseek-api', config: web },
   ]))
@@ -83,7 +78,6 @@ async function bootComposition(web: Record<string, unknown>, environment: Record
     }
     host.loader.internal = modules
     host.provide('launchEnvironment', createLaunchEnvironmentSnapshot([{ source: 'process', values: environment }]))
-    host.provide('deepseekAccount', { resolveToken: async () => 'account-token' } as Pick<DeepSeekAccount, 'resolveToken'> as DeepSeekAccount)
   })
   cleanups.push(async () => { await ctx.fiber.dispose() })
   const sent = (): Sent[] => fetchMock.mock.calls.flatMap(([endpoint, init]) => {

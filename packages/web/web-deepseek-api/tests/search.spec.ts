@@ -80,8 +80,8 @@ describe('DeepSeekSearchApiProvider availability', () => {
     expect(searchProvider(options).available()).toBe(true)
   })
 
-  it('is available with only an account token resolver', () => {
-    expect(searchProvider({ ...options, auth: { account: { baseURL: options.baseURL, resolveToken: async () => 'account-token', rejectToken: async () => {} } } }).available()).toBe(true)
+  it('is available with only a key resolver', () => {
+    expect(searchProvider({ ...options, auth: { resolveApiKey: async () => 'resolved-key' } }).available()).toBe(true)
   })
 
   it('is misconfigured when the base URL is unparseable', () => {

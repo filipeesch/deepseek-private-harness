@@ -82,23 +82,11 @@ export const VIEWER_ENDPOINT_CLASSES = {
   // No reader role names these, so the conservative class is owner-only. A share's method policy
   // decides whether one installed plugin's method reaches its viewers; this table only decides what
   // the core share roles grant.
-  'account/ackBonusNotified': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/cancelSignIn': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/getBalance': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/getProfile': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/getState': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/getUnnotifiedBonuses': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/hasRunningAccountTasks': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/signOut': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/startSignIn': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/watch': 'owner-only', // owner account and sign-in; the served page never reads it
-  'account/watchExpiry': 'owner-only', // owner account and sign-in; the served page never reads it
   'job/follow': 'owner-only', // owner background jobs'
   'job/kill': 'owner-only', // owner background jobs
   'job/list': 'owner-only', // owner background jobs'
   'fileReferences/list': 'owner-only', // owner file references'
   'session/create': 'owner-only', // owner creates a Session
-  'session/initializeDefaultModel': 'owner-only', // owner initializes a Session default model
   'session/openWorkspacePath': 'owner-only', // owner opens a Workspace path
   'session/search': 'owner-only', // owner searches across Sessions
   'session/selectModel': 'owner-only', // owner selects a Session model

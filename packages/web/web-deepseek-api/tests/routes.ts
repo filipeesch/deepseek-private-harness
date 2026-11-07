@@ -1,12 +1,11 @@
 /** Stand-in model and loader services that expose DeepSeek model routes the way the provider directory does. */
 import { FiberState, type Context } from '@deepseek-ai/cordis'
-import { Config as AccountConfig } from '@deepseek-ai/dsh-llm-deepseek-account'
 import { Config as OfficialConfig } from '@deepseek-ai/dsh-llm-deepseek-api-key'
 
 /** One model route row. */
 export interface RouteRow {
   /** Provider id the route registers. */
-  provider: 'deepseek-official' | 'deepseek-account'
+  provider: 'deepseek-official'
   /** Route plugin config, parsed by the route package's own schema. */
   config?: Record<string, unknown>
   /** Loader package name; defaults to the package that registers the provider. */
@@ -19,7 +18,6 @@ export interface RouteRow {
 
 const PACKAGES = {
   'deepseek-official': '@deepseek-ai/dsh-llm-deepseek-api-key',
-  'deepseek-account': '@deepseek-ai/dsh-llm-deepseek-account',
 } as const
 
 /**
@@ -34,7 +32,7 @@ export function provideRoutes(ctx: Context, routes: readonly RouteRow[]): void {
       options: { id: `route-${String(index)}`, name: route.name ?? PACKAGES[route.provider] },
       fiber: {
         state: route.state ?? FiberState.ACTIVE,
-        effectiveConfig: route.provider === 'deepseek-official' ? OfficialConfig(route.config ?? {}) : AccountConfig(route.config ?? {}),
+        effectiveConfig: OfficialConfig(route.config ?? {}),
       },
     },
   }))
