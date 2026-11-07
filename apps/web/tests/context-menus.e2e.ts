@@ -44,7 +44,7 @@ describe.each(['MacIntel', 'Win32', 'Linux x86_64'])('web context menus on %s', 
       extraOverlayPath: fileURLToPath(new URL('./context-menus.overlay.yml', import.meta.url)),
     })
     await mkdir(join(scaffold.workspaceCwd, 'folder'))
-    await scaffold.ctx.workspaceRegistry.create(join(scaffold.workspaceCwd, 'folder'), 'Menu workspace')
+    await scaffold.ctx.workspaceRegistry.create(join(scaffold.workspaceCwd, 'folder'), { title: 'Menu workspace' })
     await writeFile(join(scaffold.workspaceCwd, 'first.txt'), 'FIRST\nSECOND\nTHIRD\n')
     await writeFile(join(scaffold.workspaceCwd, 'second.txt'), 'SECOND FILE\n')
     await writeFile(join(scaffold.workspaceCwd, 'original.gif'), GIF)

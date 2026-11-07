@@ -153,6 +153,13 @@
     visibility 0s linear;
 }
 
+/* The cluster caps its width at the actions it currently holds: two by
+   default, three while the hidden-Workspace reveal control is relevant.
+   Must stay above .headerActionsHidden so the collapse still wins. */
+.headerActionsWithReveal {
+  max-width: 92px;
+}
+
 .headerActionsHidden {
   max-width: 0;
   opacity: 0;

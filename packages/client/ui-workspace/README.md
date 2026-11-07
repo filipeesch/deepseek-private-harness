@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion; the Session row menu and its hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions remain hidden. An idle, unarchived Session row with active scheduled tasks shows a clock mark, and its hover card lists those tasks. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, adding is unavailable.
+This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and deletion; Session menus and hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions stay hidden. An idle Session row with active scheduled tasks shows a clock mark. Canonically distinct paths remain separate Workspaces, and a Workspace a plugin hides stays out of every surface until the reader reveals it. Adding a Workspace requires a composed directory picker.
 
 ## Table of Contents
 
@@ -46,6 +46,13 @@ Choose **Add workspace** and select a directory to register it and open a Sessio
 Hierarchy uses registered canonical paths only. It does not scan for projects or resolve symlink aliases. Nesting does not change Session working directories, logs, or Workspace membership. Deleting a parent Workspace leaves its child Workspaces registered and places them under their next registered ancestor, or at the root.
 
 On devices without hover, expanded Workspace rows keep their menu and New Session controls visible, and archived search results keep the Unarchive control visible.
+
+<a id="hidden-workspaces"></a>
+### Hidden workspaces
+
+A Workspace can be registered or marked hidden through the Workspace API; this package never hides one on its own, and its row menu offers no such action. While hidden Workspaces are not revealed, the sidebar renders no section for one and none of its Sessions, and those Sessions never fall into Ungrouped: they stay accounted, keep their saved order and their Workspace's expansion, and return to their places when the Workspace is revealed. The Workspace holding the Session open in the main view is the one exception — its section stays rendered so the conversation in front of the reader never loses its row — and the flat list applies the same exception by keeping only that Session's row. Search has no exception: a hidden Workspace's Sessions match only while hidden Workspaces are revealed. The hero picker and the fallback that chooses a Workspace for a new Session follow the same choice, while an explicit request naming a hidden Workspace is still honored. Opening an existing Session of a hidden Workspace, creating one in it, renaming it, reordering it, and following its rows all behave like a visible Workspace.
+
+A reveal control in the section header alternates between omitting and revealing hidden Workspaces, using an open or closed folder glyph and a label that states the current choice. It appears only while at least one Workspace is hidden or hidden Workspaces are already revealed, so an installation that hides nothing keeps its header unchanged. The choice defaults to omitted, persists in the current browser's view state, and applies to every surface this package renders.
 
 ### Search
 
@@ -195,6 +202,8 @@ A dynamically loaded browser half follows the same component contract; which mod
 ### View state
 
 Workspace and Session rows are 32px high and share a 16px leading cell and 6px label gap, with 8px trailing padding. Grouped Session rows, flat lists, and search results use 2px row gaps; Workspace groups retain 4px gaps. Action centers are 29px apart, leaving 5px between their 24px targets. The built-in More action uses a 16px glyph; other built-in row actions use 14px glyphs. The time label has a -1px end margin, and the Workspace heading label has a -1px left offset. The expanded sidebar toolbar gives its collapsed search, view, and add controls a separate 1px trailing inset; the heading label and expanded search retain their own alignment. Session insertion markers compensate for the transparent side borders without moving row content.
+
+One pure projection decides Workspace visibility for every surface this package renders. The grouped tree receives the complete Workspace list plus the ids the surface must omit, so an omitted Workspace still accounts for its Sessions and still nests its visible children; the flat list and search receive the Sessions to exclude, keeping the selected Session's row only in the list; and the picker and the new-Session fallback receive the eligible list alone. The reveal choice itself is persisted view state, read as "omitted" when an older blob has no field for it.
 
 Once the Workspace baseline is ready, browser-persisted expansion and Session-order records retain only current Workspace ids plus Ungrouped and the flat-list account. `WorkspaceView.sessionIds` supplies real-Workspace membership, not Session display order. View actions receive complete account orders, never filtered rows. A new member without a Session summary waits for that summary, while a saved position survives a temporarily missing summary. Archive visibility is applied only when deriving rows. Pin and drag writes save complete orders; ordinary derivation does not write them. The selected blank Session remains an explicit position write, including during Workspace reconnection, when other saved members are retained until the baseline establishes membership. Ordering remains mounted while the sidebar is a rail or search replaces its body. Last updated derives from current summaries without reading saved positions; equal timestamps use Session ids as a stable tie-break.
 

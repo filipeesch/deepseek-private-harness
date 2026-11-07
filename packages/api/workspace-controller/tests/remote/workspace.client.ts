@@ -57,6 +57,7 @@ export function workspace(id: string, overrides: Partial<WorkspaceView> = {}): W
     sessionIds: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    hidden: false,
     ...overrides,
   }
 }

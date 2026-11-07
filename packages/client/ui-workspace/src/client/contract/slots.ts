@@ -512,9 +512,13 @@ export type WorkspaceBrowserProps =
  * callback; this callback creates only the real Host Workspace. A type alias
  * supplies the implicit index signature required by the registry.
  */
-export type WorkspacePickerInjected = DirectoryPickingInjected & {
+export type WorkspacePickerInjected = {
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  hooks: DirectoryPickingInjected['hooks'] & {
+    /** Whether this browser currently reveals hidden Workspaces. */
+    showHiddenWorkspaces: HostObservable<boolean>
+  }
 }
 
 /**

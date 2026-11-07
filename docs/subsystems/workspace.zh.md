@@ -47,8 +47,20 @@ interface Workspace {
   /** ISO-8601 creation instant, stamped at create and never rewritten. */
   readonly createdAt: string
 
-  /** ISO-8601 instant of the last durable mutation (create counts as one). */
+  /**
+   * ISO-8601 instant of the last durable mutation (create counts as one). Each
+   * accepted mutation stamps a strictly later instant than the previous one,
+   * so two writes cannot tie.
+   */
   readonly updatedAt: string
+
+  /**
+   * Whether browsing surfaces omit this Workspace together with its Sessions.
+   * Presentation only: a hidden Workspace still accepts Sessions, renames, and
+   * reads exactly as a visible one, and nothing outside the browser consults
+   * the flag.
+   */
+  readonly hidden: boolean
 
   /**
    * Header-validated sessions in manually owned order: a new session is
@@ -69,6 +81,15 @@ interface Workspace {
    * @returns resolution after durability.
    */
   setTitle(title: string): Promise<void>
+
+  /**
+   * Replace the hidden flag durably. Setting the value it already has resolves
+   * without a durable write, aside from the durable filtered-candidate prune
+   * every accepted mutation performs.
+   * @param hidden - `true` to omit this Workspace from browsing surfaces.
+   * @returns resolution after durability.
+   */
+  setHidden(hidden: boolean): Promise<void>
 
   /**
    * Prepend a session to this workspace's candidate account. An already
@@ -119,9 +140,11 @@ interface Workspace {
 
 所有权的真源是记录中有序的 `sessionIds`，绝不从会话 cwd 派生。成员资格将记录的 header cwd 与工作区路径校验；已有候选的完全限定 cwd 在路径解析或目录 stat 时返回 `ENOENT`，仍保留其归属。这会保留目录缺失或符号链接失效时的记账关系，但不会接纳新会话。失败的写入会拒绝（`insertSessionBefore` 的账本错误以 `WorkspaceMoveInvalidError` 拒绝，存储失败以普通错误拒绝）；每次被接受的变更都盖上 `updatedAt` 时间戳，并持久修剪不再通过成员资格检查的候选项。
 
+隐藏标记是记录的一个属性，通过实体上的 `setHidden` 设置，或在记录新建时通过 `create` 一并设置。浏览器之外没有任何代码读取它：注册表、Session 控制器与 API 网关都把隐藏的工作区当作可见工作区处理，唯一的可观察差别是浏览器界面在读者揭示之前省略它及其会话。该行为由 [Web 客户端](web-client.zh.md)负责。
+
 ## 注册表：`ctx.workspaceRegistry`
 
-`WorkspaceRegistry`（[签名](#ctxworkspaceregistry--workspaceregistry)）拥有注册与解析。`create(path, title?)` 要求完全限定路径并将其规范化，拒绝不存在的路径（原样传出原始 `ENOENT`）或非目录；当规范路径已被拥有时原样返回既有实体；否则创建一条标题为 `title ?? defaultWorkspaceTitle(path)` 的记录并前插到持久的注册表顺序中（不同规范路径可以共享同一显示标题，没有最终路径段时使用根路径拼写）。`get(id)` 与有序的 `list()` 是同步缓存读取；`resolveByPath(path)` 应用同一套完全限定 realpath 规范但不创建。`delete(id)` 只移除注册记录、顺序条目和会话账本——目录、用户文件、实时会话和已持久化日志一概不动，因此这些会话变为 Ungrouped（[参考](../../packages/workspace/workspace/README.zh.md)）；未知 id 返回 `false`。create 与 delete 会在其两次写入（记录 + 顺序）可能分叉之前先持久写入一个待定变更标记；启动时恰好解决被标记的那次变更——通过删除被标记的表行：这会补完被中断的 delete，并回滚被中断的 create（注册可以重建，因此回滚是安全方向）——而没有标记的顺序/表不一致则作为损坏大声失败。
+`WorkspaceRegistry`（[签名](#ctxworkspaceregistry--workspaceregistry)）拥有注册与解析。`create(path, options?)` 要求完全限定路径并将其规范化，拒绝不存在的路径（原样传出原始 `ENOENT`）或非目录；当规范路径已被拥有时原样返回既有实体；否则创建一条记录并前插到持久的注册表顺序中，其标题为 `options.title ?? defaultWorkspaceTitle(path)`、隐藏标记为 `options.hidden === true`（不同规范路径可以共享同一显示标题，没有最终路径段时使用根路径拼写）。创建选项只作用于新记录：解析已登记的目录不会改动其标题与隐藏标记。`get(id)` 与有序的 `list()` 是同步缓存读取；`resolveByPath(path)` 应用同一套完全限定 realpath 规范但不创建。`delete(id)` 只移除注册记录、顺序条目和会话账本——目录、用户文件、实时会话和已持久化日志一概不动，因此这些会话变为 Ungrouped（[参考](../../packages/workspace/workspace/README.zh.md)）；未知 id 返回 `false`。create 与 delete 会在其两次写入（记录 + 顺序）可能分叉之前先持久写入一个待定变更标记；启动时恰好解决被标记的那次变更——通过删除被标记的表行：这会补完被中断的 delete，并回滚被中断的 create（注册可以重建，因此回滚是安全方向）——而没有标记的顺序/表不一致则作为损坏大声失败。
 
 会话的 cwd 在创建时由创建者赋予，而不是由本注册表赋予——API 网关从所选工作区的 `path` 解析新会话的 cwd（回退到显式或默认 cwd），先创建会话使 cwd 落入其不可变的 [`SessionHeader`](persistence.zh.md#sessionheader--metadata-beside-the-log)，再调用 `attachSession`，后者会把已存储的 header cwd 与工作区路径重新校验一遍。首次成功启动时，注册表仅凭已持久化的 header（`id`、`cwd`、`createdAt`——绝不读事件正文）引导历史：把规范 cwd 有效的会话按目录分组为工作区，最新的排在最前；「已初始化」标记最后写入，因此被中断的引导可以安全续跑。引导只发生这一次：没有 cwd 的历史遗留会话保持 Ungrouped，此后创建的会话只能通过 `attachSession` 加入工作区。
 
@@ -338,6 +361,16 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('rename') rename(request: WorkspaceRenameRequest): Promise<WorkspaceValue>
 
 /**
+ * Mark one Workspace hidden from browsing surfaces, or show it again. The
+ * response arrives once the change is durable; an unknown identity fails as
+ * `workspace/not-found` without writing. The flag is presentation only:
+ * Sessions, files, directory, and every other verb are unaffected.
+ * @param request - Workspace identity and the requested flag.
+ * @returns the updated Workspace projection.
+ */
+@Remote('setHidden') setHidden(request: WorkspaceSetHiddenRequest): Promise<WorkspaceValue>
+
+/**
  * Remove one Workspace registration while retaining files and Sessions.
  * @param request - Workspace identity to remove.
  * @returns deletion confirmation.
@@ -472,14 +505,14 @@ Durable workspace registry. Startup waits for `sessionPersistence`, builds one c
  * Create or reuse a workspace for an existing directory. The fully qualified
  * path is canonicalized through `fs.realpath`; a relative, nonexistent, or
  * non-directory path rejects. Repeated calls for the same canonical path
- * return the existing entity without changing its title.
+ * return the existing entity without changing its title or hidden flag.
  * A newly created workspace is prepended to the durable registry order.
  * Different canonical paths may share a display title.
  * @param path - Existing directory to own, in a fully qualified path spelling.
- * @param title - Display title used only when a new record is created.
+ * @param options - Title and hidden flag used only when a new record is created.
  * @returns the existing or newly durable workspace.
  */
-async create(path: string, title?: string): Promise<Workspace>
+async create(path: string, options: CreateWorkspaceOptions = {}): Promise<Workspace>
 
 /**
  * Initialize the default Workspace only while both the registry and Session

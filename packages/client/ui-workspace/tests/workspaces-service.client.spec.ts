@@ -52,6 +52,7 @@ function workspace(
   id: string,
   sessionIds: readonly SessionId[] = [],
   createdAt = '2026-01-01T00:00:00.000Z',
+  hidden = false,
 ): WorkspaceView {
   return {
     workspaceId: wid(id),
@@ -60,6 +61,7 @@ function workspace(
     sessionIds,
     createdAt,
     updatedAt: createdAt,
+    hidden,
   }
 }
 
@@ -309,6 +311,7 @@ function bench(options: BenchOptions = {}) {
     sessions,
     view.actions,
     notify,
+    () => view.getSnapshot().showHiddenWorkspaces ?? false,
   )
   return { ctx, directoryPicker, sessions, uiWorkspace, workspaces, layout, selectPanel, view, notify, requestDraftInitialization }
 }
@@ -1026,6 +1029,39 @@ describe('UiWorkspaceService', () => {
     b.sessions.list.set(sessionState())
     await vi.waitFor(() => {
       expect(b.sessions.retain).toHaveBeenCalledWith(sid('created-newest'), { source: 'mainView' })
+    })
+  })
+
+  it('skips a hidden most recent Workspace for the startup fallback', async () => {
+    const b = bench()
+    b.workspaces.list.set(workspaceState([
+      workspace('hidden-newest', [], '2026-03-01T00:00:00.000Z', true),
+      workspace('older', [], '2026-01-01T00:00:00.000Z'),
+    ]))
+    b.sessions.list.set(sessionState())
+    await vi.waitFor(() => {
+      expect(b.sessions.retain).toHaveBeenCalledWith(sid('created-older'), { source: 'mainView' })
+    })
+  })
+
+  it('falls back to a hidden most recent Workspace while it is revealed', async () => {
+    const b = bench()
+    b.view.actions.setShowHiddenWorkspaces(true)
+    b.workspaces.list.set(workspaceState([
+      workspace('hidden-newest', [], '2026-03-01T00:00:00.000Z', true),
+      workspace('older', [], '2026-01-01T00:00:00.000Z'),
+    ]))
+    b.sessions.list.set(sessionState())
+    await vi.waitFor(() => {
+      expect(b.sessions.retain).toHaveBeenCalledWith(sid('created-hidden-newest'), { source: 'mainView' })
+    })
+  })
+
+  it('honors an explicit hidden Workspace target', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('hidden', [], '2026-03-01T00:00:00.000Z', true)]) })
+    b.uiWorkspace.startSession(wid('hidden'))
+    await vi.waitFor(() => {
+      expect(b.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('hidden') })
     })
   })
 

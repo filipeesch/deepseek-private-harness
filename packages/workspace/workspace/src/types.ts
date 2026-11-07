@@ -60,6 +60,18 @@ export interface SessionActivity {
 }
 
 /**
+ * Caller choices for the registry's `create`: both apply only when a new
+ * record is created, and resolving an already-registered canonical path leaves
+ * the existing record's title and hidden flag untouched.
+ */
+export interface CreateWorkspaceOptions {
+  /** Display title for the new record; defaults from the canonical path. */
+  readonly title?: string
+  /** Register the new record hidden from browsing surfaces; defaults to visible. */
+  readonly hidden?: boolean
+}
+
+/**
  * One workspace: a stable id over an existing directory, a display title, and
  * an ordered candidate account of sessions. Membership validates header cwd
  * against the workspace path, but preserves an existing account when its
@@ -83,8 +95,20 @@ export interface Workspace {
   /** ISO-8601 creation instant, stamped at create and never rewritten. */
   readonly createdAt: string
 
-  /** ISO-8601 instant of the last durable mutation (create counts as one). */
+  /**
+   * ISO-8601 instant of the last durable mutation (create counts as one). Each
+   * accepted mutation stamps a strictly later instant than the previous one,
+   * so two writes cannot tie.
+   */
   readonly updatedAt: string
+
+  /**
+   * Whether browsing surfaces omit this Workspace together with its Sessions.
+   * Presentation only: a hidden Workspace still accepts Sessions, renames, and
+   * reads exactly as a visible one, and nothing outside the browser consults
+   * the flag.
+   */
+  readonly hidden: boolean
 
   /**
    * Header-validated sessions in manually owned order: a new session is
@@ -105,6 +129,15 @@ export interface Workspace {
    * @returns resolution after durability.
    */
   setTitle(title: string): Promise<void>
+
+  /**
+   * Replace the hidden flag durably. Setting the value it already has resolves
+   * without a durable write, aside from the durable filtered-candidate prune
+   * every accepted mutation performs.
+   * @param hidden - `true` to omit this Workspace from browsing surfaces.
+   * @returns resolution after durability.
+   */
+  setHidden(hidden: boolean): Promise<void>
 
   /**
    * Prepend a session to this workspace's candidate account. An already

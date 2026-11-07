@@ -50,14 +50,17 @@ With these rows mounted, creating a project shows up in the list immediately and
 
 ### Creating and ordering projects
 
-Create a project from any fully qualified directory that exists: filesystem roots such as `C:\` and ordinary directories are valid. Relative paths, Windows drive-relative paths such as `C:work`, missing paths, and files are rejected without creating a project; creating a project for a directory that already has one returns the existing project unchanged. Rename a project at any time, and move it to any position in the list:
+Create a project from any fully qualified directory that exists: filesystem roots such as `C:\` and ordinary directories are valid. Relative paths, Windows drive-relative paths such as `C:work`, missing paths, and files are rejected without creating a project; creating a project for a directory that already has one returns the existing project unchanged, including its title and hidden flag. Rename a project at any time, move it to any position in the list, and mark it hidden when a plugin owns it on the reader's behalf:
 
 ```text
 // Host consumer code, after the composition above is loaded:
-const project = await ctx.workspaceRegistry.create('/path/to/dir', 'My Project')
+const project = await ctx.workspaceRegistry.create('/path/to/dir', { title: 'My Project', hidden: true })
 await project.setTitle('Renamed')
+await project.setHidden(false)
 ctx.workspaceRegistry.list() // shows the project, newest first
 ```
+
+Creation options apply only to a new record. The hidden flag defaults to visible, so a plugin that registers an internal project can take it out of the reader's browsing surfaces in the same durable write instead of a second one.
 
 <a id="first-use-workspace"></a>
 ### First-use Workspace
@@ -75,6 +78,8 @@ A session joins the project of the directory it runs in: create a session in a p
 ### Hiding and restoring sessions, and removing projects
 
 Hide a session from the grouping when it should stop appearing there: it disappears from the visible list, while its session, history, and place in the project stay intact. A session with running work — its own turn, a running subagent, a background job, or an active reminder — is not hidden underneath that work: the registry refuses with the list of what runs, and a caller that asks to stop the work first has it stopped the way the user's own stop actions do, then hidden. Restore a hidden session when it should appear again: it returns to its recorded position under its project, or to the ungrouped sessions when it belongs to none, and continues the conversation from a regularly ended log. Remove a project when it is no longer needed: it leaves the list, and its folder, files, and session histories are never touched — those sessions become ungrouped. Adding the same directory again afterwards starts a fresh project without the old sessions.
+
+Hiding a project is a separate, project-level choice: the project and its Sessions leave the browser's browsing surfaces while the record, its folder, and its Session account stay intact, so showing it again restores the saved order. The flag is presentation only — creating a Session in a hidden project, opening an existing one, renaming, reordering, and following the projection behave exactly as for a visible project. The [web client](../../client/ui-workspace/README.md#hidden-workspaces) owns how the surfaces apply it.
 
 Workspace registration does not establish ownership of its directory. A future destructive filesystem action must be separately named, explicitly confirmed, and enforce ownership and safety checks.
 
@@ -98,7 +103,7 @@ This section explains the design decisions behind the feature and points at the 
 
 ### API behavior
 
-The API has two owners: `WorkspaceRegistry` creates, orders, and deletes projects, manages their Session accounting, and pins, unpins, archives, or restores Sessions; the `Workspace` entity exposes the display title, directory status, and Session projection. Pinning requires a known, unarchived Session; archiving clears its pin in the same durable write, and restoring does not restore that pin. Per-method contracts live in [src/index.ts](src/index.ts) and [src/entity.ts](src/entity.ts).
+The API has two owners: `WorkspaceRegistry` creates, orders, and deletes projects, manages their Session accounting, and pins, unpins, archives, or restores Sessions; the `Workspace` entity exposes the display title, the hidden flag, directory status, and Session projection. `setTitle` and `setHidden` are the two durable attribute writes; setting the flag a project already has resolves without a write, aside from the candidate prune every accepted mutation performs. Pinning requires a known, unarchived Session; archiving clears its pin in the same durable write, and restoring does not restore that pin. Per-method contracts live in [src/index.ts](src/index.ts) and [src/entity.ts](src/entity.ts).
 
 Archive admission is a capability seam over two Host events this package declares and dispatches: `workspace/session-activity` (waterfall) asks the composed providers what still runs for a Session, and `workspace/session-stop` (parallel) asks them to stop it. `archiveSession(sessionId)` asks the activity waterfall once and rejects a non-empty answer with `WorkspaceActiveSessionError`, whose `activity` lists each family with its items — the keys are the providers' own, merged into `SessionActivityKindMap`, which this package leaves empty; `archiveSession(sessionId, { stopActivity: true })` skips the activity check, writes the archive, and then dispatches the stop event, so the durable archive set already gates every wake the stops induce; a rejecting provider is logged and the archive stays. The call resolves once every provider's stop request was issued, while the stopped work settles on its own. Both questions come after the existence check and never for an already archived id. The shipped providers are the Agent registry (the running turn), the job registry seam (owned jobs), the Subagent runtime (running descendants), and the Schedule plugin (active reminders); a composition without providers archives freely.
 
@@ -114,7 +119,7 @@ Archive admission is a capability seam over two Host events this package declare
 
 ### Durable shape
 
-The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId` plus one global state holding `workspaceIds` (the authoritative display order), `archivedSessionIds`, `pinnedSessionIds`, the optional `defaultWorkspaceId` first-use identity, and the optional `pendingMutation` marker. Archive and pin sets contain Session id strings, default to empty, and carry no per-entry objects or timestamps; the pin array keeps the most recently pinned id first. Archiving clears the pin in the same global-state write without changing Workspace membership. Unarchive runs no session-existence probe, because dropping an id from the set cannot introduce an unknown one, while archive verifies the session before adding it.
+The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId` plus one global state holding `workspaceIds` (the authoritative display order), `archivedSessionIds`, `pinnedSessionIds`, the optional `defaultWorkspaceId` first-use identity, and the optional `pendingMutation` marker. Each record holds its canonical path, display title, ordered Session account, creation and mutation instants, and the hidden flag, which defaults to false so records written before it existed read as visible. Archive and pin sets contain Session id strings, default to empty, and carry no per-entry objects or timestamps; the pin array keeps the most recently pinned id first. Archiving clears the pin in the same global-state write without changing Workspace membership. Unarchive runs no session-existence probe, because dropping an id from the set cannot introduce an unknown one, while archive verifies the session before adding it.
 
 ### Lifecycle
 
@@ -180,8 +185,8 @@ These limits define when the project list is a poor fit or needs special operati
 
 This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
 
-#### Open: the `create(path, title?)` title parameter
+#### Open: the `create` title option
 
-The `title` parameter has no production caller since the gateway's create-by-name branch was removed; a code TODO proposes dropping the parameter and its `@param` clause together ([note](../../../.agents/notes/archived/simplification/2026-07-31-one-route-to-add-a-workspace.md)).
+The `title` option has no production caller since the gateway's create-by-name branch was removed; a code TODO proposes dropping the option and its `@param` clause together ([note](../../../.agents/notes/archived/simplification/2026-07-31-one-route-to-add-a-workspace.md)).
 
 </details>

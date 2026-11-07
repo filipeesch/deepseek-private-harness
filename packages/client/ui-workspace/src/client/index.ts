@@ -121,8 +121,16 @@ export function apply(ctx: Context): void {
   const rowToast = createSnapshotStore<RowToastState | null>(null)
   let toastSeq = 0
   const notify = (toast: RowToast): void => { rowToast.set({ ...toast, seq: ++toastSeq }) }
+  // The browser's reveal choice as a bare observable: the hero picker is a
+  // separate slot entry, so it reads the same store through its inject face
+  // instead of receiving a second copy of the state.
+  const showHiddenWorkspaces: HostObservable<boolean> = {
+    getSnapshot: () => viewInstance.getSnapshot().showHiddenWorkspaces ?? false,
+    subscribe: listener => viewInstance.subscribe(listener),
+  }
   const uiWorkspace = new UiWorkspaceService(
     ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify,
+    () => showHiddenWorkspaces.getSnapshot(),
   )
   ctx.slots.provideRoot({
     hooks: { workspaces: workspaces.list },
@@ -310,7 +318,7 @@ export function apply(ctx: Context): void {
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
     createWorkspace: input => workspaces.create(input),
-    hooks: { directoryFlow: pickerFlowSource },
+    hooks: { directoryFlow: pickerFlowSource, showHiddenWorkspaces },
   })
   // Each registration declares its owned children in the same call; slot
   // injection follows both the owner and declaration HMR lifetimes.
