@@ -143,7 +143,6 @@ export function createElectronBuilderConfig(
       'lib/operation-report-worker.js',
       'lib/welcome/**/*',
       'lib/preload-app.cjs',
-      'lib/preload-platform-account.cjs',
       'lib/preload-update-dialog.cjs',
       'lib/preload-welcome.cjs',
       'renderer/**/*',
