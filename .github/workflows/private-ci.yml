@@ -1,0 +1,191 @@
+name: Private CI
+
+# Merge verification of this private distribution on GitHub-hosted runners, without secrets or
+# DeepSeek infrastructure. The `private-ci passed` job is the single required status check; every
+# other job must be listed in its `needs`. See PRIVATE.md for how this file relates to upstream CI.
+#
+# Not ported from upstream: instrumented coverage (the per-file 100% gate needs unsharded runs on a
+# 16-core runner), wall-clock benchmarks (need an idle runner), the Python SDK runtime, SSH helper and
+# Computer Use helper builds, macOS and Wine lanes, and every credentialed or publishing workflow.
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+env:
+  # CI runs must never report to the telemetry endpoint baked into apps/cli/cordis.yml.
+  DSH_TELEMETRY_DISABLED: '1'
+
+# A new push supersedes the pull-request run in progress; master runs always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Repository gates that need no build: package, config, i18n, Markdown and documentation checks.
+  static:
+    name: static and docs gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # A blocking gate failure aborts the remaining gates instead of waiting them out.
+      DSH_GATE_FAIL_FAST: '1'
+      # The archive gate compares Agent Notes with the pull-request base; on a push it compares HEAD with itself.
+      DSH_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha || 'HEAD' }}
+    steps:
+      # Complete history lets the archive gate read the pull-request base commit.
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - name: Run static and documentation gates
+        run: pnpm run check:ci:static
+
+  # oxlint's type-aware rules read package declarations, so declarations are compiled first.
+  lint:
+    name: typecheck, lint and duplication
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Run lint and duplication
+        run: pnpm run check:ci:lint:contracts-ready
+
+  # The uninstrumented unit inventory (`pnpm run test`), split into shards that run in parallel.
+  unit:
+    name: unit tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Shared hosted runners delay teardown-heavy cases past Vitest's default per-test budget.
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '90000'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+        with:
+          bubblewrap: 'true'
+      - name: Build the native system addon
+        run: pnpm run build:native-system
+      - name: Run unit tests
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/4
+
+  # Official build, then every consumer of the built tree: keyless recorded-session replay, owner-local
+  # expectations, browser snapshots, publint, NodeNext consumer types, doc type checks and built-bin smokes.
+  build:
+    name: build, snapshots and artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
+      # A failing gate aborts its running siblings.
+      DSH_GATE_FAIL_FAST: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+        with:
+          bubblewrap: 'true'
+      - name: Install Playwright Chromium, WebKit and system dependencies
+        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium webkit
+      - name: Run compatibility, snapshot and artifact gates
+        run: pnpm run check:ci:consumers
+      # build:artifacts is the producer; build:check type-checks tests and scripts against its output.
+      - name: Check tests and scripts against the build output
+        run: pnpm run build:check
+
+  # The supported Node floor (24.9, whose loader is v1) and the next major release.
+  node-compat:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      DSH_GATE_CONCURRENCY: '1'
+      DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
+      # A failed smoke aborts the remaining compatibility gates.
+      DSH_GATE_FAIL_FAST: '1'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: '24.9'
+            name: node 24.9
+          - node: '26'
+            name: node 26
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+        with:
+          node-version: ${{ matrix.node }}
+          bubblewrap: 'true'
+      - name: Run compatibility smokes
+        env:
+          DSH_BUILD_CLIENT_PROFILE: official
+        run: pnpm run check:node-compat
+      - name: Check Loader internal shape detection
+        run: pnpm exec vitest run packages/boot/app-boot/tests/loader-shape.compat.spec.ts
+
+  # Desktop ships for Windows x64 only; this builds the workspace and the production documentation site natively.
+  windows-build:
+    name: windows build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DSH_GATE_FAIL_FAST: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Enable Developer Mode (symlink support)
+        run: >-
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+      - uses: ./.github/actions/setup-workspace
+      - name: Run blocking Windows builds
+        run: |
+          pnpm run check:ci:windows-blocking
+          exit $LASTEXITCODE
+      - name: Verify Desktop updater dependency versions
+        run: |
+          node --test apps/desktop/tests/updates/electron-updater/versions.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node apps/desktop/tests/updates/electron-updater/check-versions.mjs
+          exit $LASTEXITCODE
+
+  # The only name to mark as a required status check. GitHub counts a skipped job as passing, so this
+  # job always runs and fails on any needed job that did not succeed.
+  private-ci-passed:
+    name: private-ci passed
+    runs-on: ubuntu-latest
+    needs: [static, lint, unit, build, node-compat, windows-build]
+    if: ${{ always() }}
+    steps:
+      - name: Fail if any needed job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "::error::Needed job results: ${{ join(needs.*.result, ', ') }}"
+          exit 1
+      - name: All checks passed
+        run: echo "All needed jobs succeeded (${{ join(needs.*.result, ', ') }})"
