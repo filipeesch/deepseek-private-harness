@@ -98,8 +98,14 @@ async function expectHeadlessStream(normalized: string, expectedPath: string): P
 
 /** Serve one deterministic DeepSeek-compatible response while retaining its request body. */
 async function deepseekDefaultsServer(
-  options: { waitForTitleRequest?: boolean; piAiCompatibility?: true } = {},
+  options: {
+    waitForTitleRequest?: boolean
+    piAiCompatibility?: true
+    /** Gap between keep-alive comments; the default is 60 ms. */
+    keepAliveIntervalMs?: number
+  } = {},
 ): Promise<DeepSeekDefaultsServer> {
+  const keepAliveIntervalMs = options.keepAliveIntervalMs ?? 60
   const requests: JsonObject[] = []
   const paths: string[] = []
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
@@ -116,7 +122,7 @@ async function deepseekDefaultsServer(
         if (keepAlives-- > 0
           || (options.waitForTitleRequest === true && !requests.some(isTitleRequest))) {
           response.write(': keep-alive\n\n')
-          timer = setTimeout(write, 60)
+          timer = setTimeout(write, keepAliveIntervalMs)
           return
         }
         if (options.piAiCompatibility !== true) {
@@ -137,7 +143,7 @@ async function deepseekDefaultsServer(
           '',
         ].join('\n\n'))
       }
-      let timer = setTimeout(write, 60)
+      let timer = setTimeout(write, keepAliveIntervalMs)
       response.once('close', () => { clearTimeout(timer) })
     })
   })
@@ -831,7 +837,9 @@ describe('headless stream-json snapshots', () => {
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('keeps provider comments alive and sends DeepSeek defaults through the one-shot app', async () => {
-    const server = await deepseekDefaultsServer()
+    // Four 400 ms gaps exceed the fixture's 1000 ms `streamIdleTimeoutMs`, so only the comments keep the
+    // stream alive, and each gap leaves 600 ms for timer delay on a loaded runner.
+    const server = await deepseekDefaultsServer({ keepAliveIntervalMs: 400 })
     try {
       const result = await runLoaderSmoke({
         label: 'DeepSeek adapter defaults headless stream-json snapshot',
