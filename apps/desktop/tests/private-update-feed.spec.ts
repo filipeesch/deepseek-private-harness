@@ -30,24 +30,19 @@ describe('private GitHub Releases update feed', () => {
         .toEqual({ channel: expected, publish: { provider: 'github', owner: 'o', repo: 'r' } })
     })
 
-  it('packages an unsigned Windows build with the github provider and no policy service', () => {
+  it('packages an unsigned Windows build with the github provider', () => {
     const config = createElectronBuilderConfig({ ...privateEnvironment, DSH_DESKTOP_UPDATE_CHANNEL: 'stable' }, 'win32', 'x64')
     expect(config.publish).toEqual([{ provider: 'github', owner: 'example-owner', repo: 'example-repo' }])
     expect(config.extraMetadata).toMatchObject({ dshDesktopUpdateChannel: 'stable' })
-    expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
   })
 
-  it('does not require mandatory-update origins when validating a private Windows package', () => {
+  it('validates a private Windows package without update origins', () => {
     expect(() => { validateDesktopPackageEnvironment(privateEnvironment, { platform: 'win32', arch: 'x64' }, { unsigned: true }) }).not.toThrow()
-    const { [PRIVATE_UPDATE_REPOSITORY_ENV]: _repository, ...upstream } = privateEnvironment
-    expect(() => { validateDesktopPackageEnvironment(upstream, { platform: 'win32', arch: 'x64' }, { unsigned: true }) })
-      .toThrow(/MANDATORY_UPDATE/u)
   })
 
   it('leaves an unsigned build without a feed when no repository is selected', () => {
     const { [PRIVATE_UPDATE_REPOSITORY_ENV]: _repository, ...upstream } = privateEnvironment
-    const config = createElectronBuilderConfig({ ...upstream, DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
-      DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: '{"allowedAuthOrigins":["https://login.example.com"]}' }, 'win32', 'x64')
+    const config = createElectronBuilderConfig(upstream, 'win32', 'x64')
     expect(config.publish).toBeNull()
   })
 })

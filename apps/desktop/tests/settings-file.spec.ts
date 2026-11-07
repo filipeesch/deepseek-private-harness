@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { DesktopSettingsFile, isDesktopUpdateChannel } from '../src/settings-file.ts'
-import { readDesktopSettings } from '../src/settings.ts'
 import { DesktopUpdateSettings } from '../src/update-settings.ts'
 
 vi.mock('node:fs/promises', async original => ({ ...await original<typeof import('node:fs/promises')>() }))
@@ -29,7 +28,7 @@ it('distinguishes missing files from absent fields without creating a file durin
   await expect(readFile(file.path)).rejects.toMatchObject({ code: 'ENOENT' })
   await file.saveUpdates({})
   expect(await file.read()).toMatchObject({ kind: 'ready', fields: {
-    channel: { kind: 'absent' }, allowTestAuthPopupWindow: { kind: 'absent' },
+    channel: { kind: 'absent' },
   } })
 })
 
@@ -38,20 +37,18 @@ it.each([
   ['{"updates":null}', 'structure'], ['{"updates":[]}', 'structure'], ['{"updates":true}', 'structure'],
 ])('classifies malformed documents and refuses to replace them: %s', async (raw, reason) => {
   const { file } = await fixture(raw)
-  const result = await file.initialize()
+  const result = await file.read()
   expect(result).toMatchObject({ kind: 'error', error: { problem: { kind: 'invalid', reason }, path: file.path } })
   expect(JSON.stringify(result)).not.toContain('secret-value')
   await expect(file.saveUpdates({ channel: 'stable' })).rejects.toMatchObject({ problem: { kind: 'invalid', reason } })
   expect(await readFile(file.path, 'utf8')).toBe(raw)
 })
 
-it('keeps an invalid channel independent from the popup preference and repairs only the selected field', async () => {
+it('repairs only the selected invalid channel and preserves unrelated fields', async () => {
   const { root, file } = await fixture('{"other":[1],"updates":{"channel":"alpha","allowTestAuthPopupWindow":true,"future":{"x":2}}}')
   expect(await file.read()).toMatchObject({ kind: 'ready', fields: {
     channel: { kind: 'invalid', error: { problem: { kind: 'invalid', reason: 'field', field: 'channel' } } },
-    allowTestAuthPopupWindow: { kind: 'valid', value: true },
   } })
-  expect((await readDesktopSettings(root)).updates.allowTestAuthPopupWindow).toBe(true)
   expect(await new DesktopUpdateSettings(root, 'stable').load()).toMatchObject({ kind: 'error' })
   await file.saveUpdates({ channel: 'nightly' })
   expect(JSON.parse(await readFile(file.path, 'utf8'))).toEqual({ other: [1], updates: {
@@ -59,45 +56,19 @@ it('keeps an invalid channel independent from the popup preference and repairs o
   } })
 })
 
-it('keeps a valid channel usable when the popup preference is invalid', async () => {
-  const { root, file } = await fixture('{"updates":{"channel":"nightly","allowTestAuthPopupWindow":"bad"}}')
-  vi.spyOn(console, 'warn').mockImplementation(() => {})
-  expect((await readDesktopSettings(root)).updates.allowTestAuthPopupWindow).toBe(false)
-  expect(await new DesktopUpdateSettings(root, 'stable').load()).toEqual({ kind: 'ready', channel: 'nightly' })
-  await file.saveUpdates({ channel: 'stable' })
-  expect(JSON.parse(await readFile(file.path, 'utf8'))).toEqual({ updates: { channel: 'stable', allowTestAuthPopupWindow: 'bad' } })
-  await file.saveUpdates({ allowTestAuthPopupWindow: true })
-  expect(await file.read()).toMatchObject({ kind: 'ready', fields: {
-    allowTestAuthPopupWindow: { kind: 'valid', value: true }, channel: { kind: 'valid', value: 'stable' },
-  } })
-})
-
-it('classifies unreadable files without attempting initialization', async () => {
+it('classifies unreadable files without replacing them', async () => {
   const { file } = await fixture()
   await mkdir(file.path, { recursive: true })
-  expect(await file.initialize()).toMatchObject({ kind: 'error', error: { problem: { kind: 'read' } } })
+  expect(await file.read()).toMatchObject({ kind: 'error', error: { problem: { kind: 'read' } } })
   expect((await fs.stat(file.path)).isDirectory()).toBe(true)
 })
 
-it('serializes initializers and patches from separate storage instances without losing fields', async () => {
+it('serializes patches from separate storage instances without losing fields', async () => {
   const { root, file } = await fixture()
   const other = new DesktopSettingsFile(root)
-  await Promise.all([file.initialize(), other.initialize()])
-  await Promise.all([file.saveUpdates({ channel: 'stable' }), other.saveUpdates({ allowTestAuthPopupWindow: true })])
-  expect(JSON.parse(await readFile(file.path, 'utf8'))).toEqual({ updates: { channel: 'stable', allowTestAuthPopupWindow: true } })
+  await Promise.all([file.saveUpdates({ channel: 'stable' }), other.saveUpdates({})])
+  expect(JSON.parse(await readFile(file.path, 'utf8'))).toEqual({ updates: { channel: 'stable' } })
   await expect(fs.access(`${file.path}.lock`)).rejects.toMatchObject({ code: 'ENOENT' })
-})
-
-it('preserves a file created by an external writer during exclusive initialization', async () => {
-  const { file } = await fixture()
-  const original = fs.writeFile
-  const external = '{"updates":{"channel":"nightly"},"external":true}'
-  vi.spyOn(fs, 'writeFile').mockImplementation(async (path, contents, options) => {
-    if (path === file.path) await original(path, external)
-    return original(path, contents, options)
-  })
-  expect(await file.initialize()).toMatchObject({ kind: 'ready', fields: { channel: { kind: 'valid', value: 'nightly' } } })
-  expect(await readFile(file.path, 'utf8')).toBe(external)
 })
 
 it('reports preparation failure as unchanged and does not create a file', async () => {
@@ -142,21 +113,6 @@ it.each([null, false, 1, 'alpha', ''])('rejects an explicit invalid channel with
   const { file } = await fixture(JSON.stringify({ updates: { channel } }))
   expect(isDesktopUpdateChannel(channel)).toBe(false)
   expect(await file.read()).toMatchObject({ kind: 'ready', fields: { channel: { kind: 'invalid' } } })
-})
-
-it('reports a partial initialization write as uncertain and preserves it for diagnosis', async () => {
-  const { file } = await fixture()
-  const original = fs.writeFile
-  vi.spyOn(fs, 'writeFile').mockImplementation(async (path, contents, options) => {
-    if (path !== file.path) return original(path, contents, options)
-    await original(path, '{', options)
-    throw new Error('disk write interrupted')
-  })
-  expect(await file.initialize()).toMatchObject({ kind: 'error', error: { problem: {
-    kind: 'write', operation: 'initialize', effect: 'unknown',
-  } } })
-  expect(await readFile(file.path, 'utf8')).toBe('{')
-  expect(await file.initialize()).toMatchObject({ kind: 'error', error: { problem: { kind: 'invalid', reason: 'json' } } })
 })
 
 it('rereads fields after acquiring the writer lock instead of saving a stale snapshot', async () => {
