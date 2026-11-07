@@ -2,6 +2,10 @@
 
 DeepSeek Harness is an all-plugin Cordis agent harness. Read [docs/architecture.md](docs/architecture.md) before changing `packages/`; follow [docs/AGENTS.md](docs/AGENTS.md) for documentation.
 
+## Private distribution
+
+This is `filipeesch/deepseek-private-harness`, a private distribution of `deepseek-ai/deepseek-harness` (remote `upstream`). Invariant: send nothing to external parties except model, search, plugin, and update requests the user configures — no telemetry, analytics, feedback upload, usage identifiers, Session-log upload, or account Sign In. When syncing upstream, the private side wins every conflict touching this invariant; never run `gh repo sync --force`. Read [PRIVATE.md](PRIVATE.md) before merging upstream or touching network, telemetry, account, or update code.
+
 ## Pre-stable APIs and released Session data
 
 Public APIs are pre-stable; update every consumer. Follow [version/status](docs/session-format-status.md) and [type acknowledgements](docs/cookbook/reviewing-persistence-type-changes.md). [Adjacent migration](.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) may add a version-named successor but never move, overwrite, or delete committed generations; predecessors imply neither fallback nor downgrade support. SQLite uses monotonic `SCHEMA_VERSION`.
