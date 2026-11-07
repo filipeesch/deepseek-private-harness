@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { createLaunchEnvironmentSnapshot, DSH_LAUNCH_ENVIRONMENT_KEY } from '@deepseek-ai/dsh-launch-environment'
-import { deepSeekApiKeyConfigured, rejectDeepSeekAccountToken, resolveDeepSeekAccountToken, resolveDeepSeekApiKey } from '../src/credential.ts'
+import { deepSeekApiKeyConfigured, resolveDeepSeekApiKey } from '../src/credential.ts'
 
 const ref = credentialRef('TEST_DEEPSEEK_KEY')
 
@@ -51,21 +51,6 @@ describe('shared DeepSeek credentials', () => {
     try {
       await expect(resolveDeepSeekApiKey(ctx, ref)).resolves.toBe('stored-key')
       await expect(resolveDeepSeekApiKey(ctx, ref)).rejects.toMatchObject({ code: 'INVALID_CREDENTIAL' })
-    } finally { await ctx.fiber.dispose() }
-  })
-
-  it('delegates account destination checks and contains token-removal failures', async () => {
-    const ctx = context()
-    try {
-      await expect(resolveDeepSeekAccountToken(ctx, 'https://allowed.test')).resolves.toBeUndefined()
-      await expect(rejectDeepSeekAccountToken(ctx, 'old-token')).resolves.toBeUndefined()
-      const resolveToken = vi.fn(async () => 'account-token')
-      const rejectToken = vi.fn(async () => { throw new Error('storage failed') })
-      ctx.provide('deepseekAccount', { resolveToken, rejectToken } as never)
-      await expect(resolveDeepSeekAccountToken(ctx, 'https://allowed.test')).resolves.toBe('account-token')
-      expect(resolveToken).toHaveBeenCalledExactlyOnceWith('https://allowed.test')
-      await expect(rejectDeepSeekAccountToken(ctx, 'old-token')).resolves.toBeUndefined()
-      expect(rejectToken).toHaveBeenCalledExactlyOnceWith('old-token')
     } finally { await ctx.fiber.dispose() }
   })
 })

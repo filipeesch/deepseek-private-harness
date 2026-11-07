@@ -34,7 +34,7 @@ export interface DesktopUpdateBridge {
   subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
 }
 
-/** Shared carrier status for the account row and collapsed sidebar badge. */
+/** Shared carrier status for the settings update indicator and collapsed sidebar badge. */
 export interface DesktopUpdateView {
   readonly presentation?: DesktopUpdatePresentation
   readonly failed: boolean

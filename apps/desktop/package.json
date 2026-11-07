@@ -50,8 +50,6 @@
   "dependencies": {
     "electron-updater": "^6.8.9",
     "semver": "^7.8.5",
-    "ws": "^8.21.3",
-    "@deepseek-ai/dsh-api-gateway": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
@@ -76,8 +74,6 @@
     "pnpm": "11.28.5",
     "sharp": "0.35.5",
     "typescript": "^6.0.3",
-    "@deepseek-ai/dsh-deepseek-account": "workspace:*",
-    "@types/ws": "^8.18.1",
     "@deepseek-ai/dsh-client-ui-primitives": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -85,7 +81,6 @@
     "@deepseek-ai/dsh-client-ui-theme": "workspace:*",
     "@deepseek-ai/dsh-client-shortcuts": "workspace:*",
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
-    "@deepseek-ai/dsh-client-product-analytics": "workspace:*",
     "@deepseek-ai/dsh-plugin-manager": "workspace:*",
     "zod": "4.4.3",
     "@deepseek-ai/dsh-util-file-drag": "workspace:*",

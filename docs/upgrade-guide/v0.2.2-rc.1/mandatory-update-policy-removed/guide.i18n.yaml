@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-rc.1/mandatory-update-policy-removed/guide.md
+/:
+  en: 76fa2bb1a60fedf7
+  zh: d265275cec0275da
+/the-desktop-mandatory-update-policy-is-removed:
+  en: a867dba367ddf754
+  zh: f08a9f959ea63055
+/the-desktop-mandatory-update-policy-is-removed/change:
+  en: 59efa7a2ad1356f5
+  zh: c1b231e8a313a2b8
+/the-desktop-mandatory-update-policy-is-removed/migration:
+  en: fd5c316839d416f7
+  zh: 90852f6bc99e9aef

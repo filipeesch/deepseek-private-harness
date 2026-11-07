@@ -55,7 +55,7 @@ function failureMessage(
 ): string {
   if (code === 'ACCOUNT_SIGNED_OUT') return t('message.failure.accountSignedOut')
   if (code === 'INTERRUPTED') return t('message.failure.interrupted')
-  if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
+  // ACCOUNT_QUOTA appears only in Session logs written by earlier releases.
   if (code === 'QUOTA' || code === 'ACCOUNT_QUOTA') return t('message.failure.quota')
   return code === 'AUTH' ? t('message.failure.auth') : message
 }

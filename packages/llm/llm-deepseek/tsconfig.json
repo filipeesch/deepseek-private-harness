@@ -8,8 +8,9 @@
     "src"
   ],
   "references": [
-    { "path": "../../credentials/credentials" },
-    { "path": "../../credentials/deepseek-account" },
+    {
+      "path": "../../credentials/credentials"
+    },
     {
       "path": "../../../vendor/cosmokit"
     },
@@ -45,9 +46,6 @@
     },
     {
       "path": "../../util/timeout"
-    },
-    {
-      "path": "../../identity/anonymous-user-id"
     },
     {
       "path": "../../util/http-proxy"

@@ -38,7 +38,8 @@ function endFailure(reason: TurnEndReason): { readonly message: string; readonly
     case 'error':
       return reason.error
     case 'aborted':
-      // User and parent cancellations show only the stopped turn summary.
+      // User and parent cancellations show only the stopped turn summary; the sign-out reason survives only in
+      // Session logs written by earlier releases.
       return reason.reason.kind === 'hook' && reason.reason.reason === 'deepseek-account/signed-out'
         ? { message: 'Stopped because you signed out of DeepSeek.', code: 'ACCOUNT_SIGNED_OUT' }
         : undefined

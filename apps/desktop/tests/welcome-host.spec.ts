@@ -16,11 +16,8 @@ function transport(preference?: string) {
       payload: { args: { ref: string; value: string; refs: string[] } }
     }
     let value: unknown
-    if (method === 'account/getState') value = { links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null }
-    else if (method === 'settings/describe') value = { namespaces }
+    if (method === 'settings/describe') value = { namespaces }
     else if (method === 'llm/listConfigurableProviders') value = [{ settingsNs: 'llm-pi-ai', settingsPath: ['profiles', 'example'] }]
-    else if (method === 'productAnalytics/enabled') value = true
-    else if (method === 'productAnalytics/report') value = undefined
     else if (method === 'credentials/set') keys.set(payload.args.ref, payload.args.value)
     else value = Object.fromEntries(payload.args.refs.map(ref => [ref, { configured: keys.has(ref), writable: true }]))
     return Response.json({ type: 'server-response', rpcId, result: { ok: true, value } })
@@ -35,10 +32,9 @@ describe('desktop welcome Web operations', () => {
   it('authenticates with the explicit Host cookie and stores only through the configured credential reference', async () => {
     const host = transport()
     const backend = connectDesktopWelcome(url, cookie, host.send)
-    expect(await backend.analyticsEnabled()).toBe(true)
     expect(await backend.save('sk-example')).toEqual({ ok: true })
     expect(host.keys.get('CUSTOM_DEEPSEEK_KEY')).toBe('sk-example')
-    expect(await backend.read()).toEqual({ loggedIn: false, hasApiKey: true, writable: true, localePreference: null })
+    expect(await backend.read()).toEqual({ hasApiKey: true, writable: true, localePreference: null })
     for (const [input, init] of host.send.mock.calls) {
       expect(input).toMatch(/^http:\/\/127\.0\.0\.1:19387\/api\//u)
       expect(init).toMatchObject({ redirect: 'error', headers: { cookie } })
@@ -56,7 +52,7 @@ describe('desktop welcome Web operations', () => {
     expect(host.send.mock.calls.every(([, init]) => !(init?.body as string | undefined)?.includes('credentials/set'))).toBe(true)
   })
 
-  it('reads language without querying account or model providers', async () => {
+  it('reads language without querying model providers', async () => {
     const host = transport('zh')
     const backend = connectDesktopWelcome(url, cookie, host.send)
     host.send.mockClear()
@@ -91,17 +87,5 @@ describe('desktop welcome Web operations', () => {
     expect(await backend.save('sk-example')).toEqual({ ok: false })
     host.send.mockResolvedValueOnce(Response.json({ type: 'server-response', rpcId: 'other', result: { ok: true } }))
     await expect(backend.read()).rejects.toThrow('Web RPC failed')
-  })
-
-  it('submits native analytics through authenticated RPC with a bounded request', async () => {
-    const host = transport()
-    const backend = connectDesktopWelcome(url, cookie, host.send)
-    const event = { eventName: 'desktop_app_launch' as const, timestamp: 100, attributes: {} }
-    await backend.report(event)
-    const [input, init] = host.send.mock.calls.at(-1)!
-    expect(input).toBe('http://127.0.0.1:19387/api/productAnalytics/report')
-    expect(init?.headers).toMatchObject({ cookie })
-    expect(init?.signal).toBeInstanceOf(AbortSignal)
-    expect(JSON.parse(init!.body as string)).toMatchObject({ payload: { args: { event } } })
   })
 })

@@ -14,6 +14,24 @@ DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来
 
 运行本项目前，请阅读[安全说明](SAFETY.zh.md)。
 
+## 私有发行版
+
+本仓库是 DeepSeek Harness 的私有发行版，没有遥测、分析、使用标识符、会话日志上传和账号登录。它不提供 Desktop 安装包、发布版本或自动更新；所有人都从源码运行 Web 版。维护者在同步上游之前请阅读 [PRIVATE.md](PRIVATE.md)。
+
+要求：Node.js 24.9 或更高版本，以及 pnpm。克隆本仓库后运行：
+
+```sh
+pnpm install
+pnpm run build:artifacts
+make web
+```
+
+`make web` 会在 `http://127.0.0.1:3080` 提供已构建的 Web UI，并用默认浏览器打开。界面提示时，在设置 → 模型中添加你的 `DEEPSEEK_API_KEY` 或其他提供方的密钥，也可以在启动前导出该密钥（[提供方指南](docs/user/guide/providers.zh.md)）。
+
+更新时依次运行 `git pull`、`pnpm install`、`pnpm run build:artifacts`，然后运行 `make web`。
+
+请勿为本发行版运行 `npx @deepseek-ai/dsh web` 或下文的上游克隆命令：它们获取的是上游软件包和源码，不在上述保证范围内。
+
 <a id="run"></a>
 
 ## 运行

@@ -38,7 +38,7 @@ try {
   }))
   await cp(join(repo, 'apps/desktop/lib/types'), join(application, 'lib'), { recursive: true })
   await cp(join(repo, 'apps/desktop/renderer'), join(application, 'renderer'), { recursive: true })
-  for (const name of ['preload-app', 'preload-mandatory', 'preload-update-dialog']) {
+  for (const name of ['preload-app', 'preload-update-dialog']) {
     await cp(join(repo, `apps/desktop/lib/${name}.cjs`), join(application, `lib/${name}.cjs`))
   }
   await writeFile(join(application, 'package.json'), JSON.stringify({ name: 'desktop-update-qualification', version: manifest.version, type: 'module' }))
@@ -52,7 +52,6 @@ try {
   await writeFile(join(profile, 'cordis.patch.yml'), JSON.stringify([
     { id: 'webserver', config: { host: '127.0.0.1', port: 0 } },
     { id: 'llm-deepseek', disabled: true }, { id: 'session-title-llm', disabled: true },
-    { id: 'session-telemetry-otel', disabled: true },
     { id: 'agent-preset-registry', config: { default: 'standard' } },
     { insert: [{ id: 'update-control', name: new URL('../tests/fixtures/workspace-update-host.mjs', import.meta.url).href }] },
   ]))

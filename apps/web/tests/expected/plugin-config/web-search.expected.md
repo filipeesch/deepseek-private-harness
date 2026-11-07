@@ -4,7 +4,7 @@
 - region "网页搜索提供方":
   - heading "网页搜索提供方" [level=4]
   - button "网页搜索提供方 DeepSeek Search API": DeepSeek Search API
-  - paragraph: 直接请求搜索接口返回标题、URL 与摘要，无需额外调用模型。使用当前会话的 DeepSeek 账号或 DeepSeek API Key，可能产生计费
+  - paragraph: 直接请求搜索接口返回标题、URL 与摘要，无需额外调用模型。使用 DeepSeek API Key，可能产生计费
   - paragraph:
     - link "网页搜索与获取指南":
       - /url: https://api-docs.deepseek.com/zh-cn/guides/search
@@ -16,5 +16,5 @@
 - region "网页获取提供方":
   - heading "网页获取提供方" [level=4]
   - button "网页获取提供方 DeepSeek Fetch API": DeepSeek Fetch API
-  - paragraph: 由 DeepSeek 服务端抓取公网页面并返回 Markdown。使用当前会话的 DeepSeek 账号或 DeepSeek API Key，可能产生计费，且无法访问内网和本机
+  - paragraph: 由 DeepSeek 服务端抓取公网页面并返回 Markdown。使用 DeepSeek API Key，可能产生计费，且无法访问内网和本机
 - button "保存" [disabled]
