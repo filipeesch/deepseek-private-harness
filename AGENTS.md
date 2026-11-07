@@ -4,7 +4,7 @@ DeepSeek Harness is an all-plugin Cordis agent harness. Read [docs/architecture.
 
 ## Privacy fork
 
-This is `filipeesch/deepseek-harness`, a fork of `deepseek-ai/deepseek-harness` (remote `upstream`). Invariant: send nothing to external parties except model, search, plugin, and update requests the user configures — no telemetry, analytics, feedback upload, usage identifiers, Session-log upload, or account Sign In. When syncing upstream, the fork's side wins every conflict touching this invariant; never run `gh repo sync --force`. Read [FORK.md](FORK.md) before merging upstream or touching network, telemetry, account, or update code.
+This is `filipeesch/deepseek-private-harness`, a fork of `deepseek-ai/deepseek-harness` (remote `upstream`). Invariant: send nothing to external parties except model, search, plugin, and update requests the user configures — no telemetry, analytics, feedback upload, usage identifiers, Session-log upload, or account Sign In. When syncing upstream, the fork's side wins every conflict touching this invariant; never run `gh repo sync --force`. Read [FORK.md](FORK.md) before merging upstream or touching network, telemetry, account, or update code.
 
 ## Pre-stable APIs and released Session data
 

@@ -77,7 +77,7 @@ jobs:
         shell: pwsh
     env:
       # Fixed for the life of the fork: a changed application identifier installs beside, not over, earlier releases.
-      DSH_DESKTOP_APP_ID: io.github.filipeesch.deepseek-harness
+      DSH_DESKTOP_APP_ID: io.github.filipeesch.deepseek-private-harness
       DSH_DESKTOP_FORK_UPDATE_REPOSITORY: ${{ github.repository }}
       DSH_DESKTOP_UPDATE_CHANNEL: ${{ needs.prepare.outputs.channel }}
     steps:
