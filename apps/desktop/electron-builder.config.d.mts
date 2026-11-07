@@ -60,8 +60,7 @@ export interface DesktopElectronBuilderConfig {
   readonly afterPack: (context: AfterPackContext) => Promise<void>
   readonly afterSign: (context: AfterPackContext) => Promise<void>
   readonly artifactBuildCompleted: (artifact: { readonly file: string }) => Promise<void> | undefined
-  readonly publish: readonly [{ readonly provider: 'generic', readonly url: string }]
-    | readonly [{ readonly provider: 'github', readonly owner: string, readonly repo: string }] | null
+  readonly publish: readonly [{ readonly provider: 'generic', readonly url: string }] | null
 }
 
 /**

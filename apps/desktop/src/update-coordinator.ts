@@ -6,8 +6,7 @@ import { app } from 'electron'
 import electronUpdater, { type AppUpdater, type ProgressInfo, type UpdateInfo, type UpdateCheckResult } from 'electron-updater'
 import { gt, valid } from 'semver'
 import type { DesktopUpdateState } from './ipc.ts'
-import { AnonymousUpdateHttpExecutor, withholdUpdaterIdentity } from './updates/electron-updater/anonymous.ts'
-import { registerGithubFeed } from './updates/electron-updater/github-feed.ts'
+import { DesktopUpdateHttpExecutor } from './updates/electron-updater/http-executor.ts'
 import { DesktopUpdatePreparationError, downloadFailureDetails } from './update-error.ts'
 import type { DesktopUpdateChannel } from './update-channel.ts'
 import { selectUpdateChannel } from './updates/electron-updater/channel.ts'
@@ -71,13 +70,11 @@ export class DesktopUpdateCoordinator {
     if (updater === autoUpdater) {
       // electron-updater omits this internal transport property from its public declarations.
       // Real-Electron qualification exercises the pinned dependency integration.
-      const transportOwner = updater as AppUpdater & { httpExecutor: AnonymousUpdateHttpExecutor }
-      transportOwner.httpExecutor = new AnonymousUpdateHttpExecutor(
+      const transportOwner = updater as AppUpdater & { httpExecutor: DesktopUpdateHttpExecutor }
+      transportOwner.httpExecutor = new DesktopUpdateHttpExecutor(
         Number(process.env.DSH_DESKTOP_UPDATE_HTTP_IDLE_TIMEOUT_MS ?? 60_000),
         (authInfo, callback) => { updater.emit('login', authInfo, callback) },
       )
-      withholdUpdaterIdentity(updater)
-      registerGithubFeed(updater)
     }
     this.updater.autoDownload = false
     this.updater.autoInstallOnAppQuit = false

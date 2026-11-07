@@ -7,7 +7,6 @@ import { readDesktopPackageSettings as readSettings } from './desktop-file-setti
 import { resolveDesktopAppId, resolveMacOSNotarizationEnvironment, resolveMacOSSigningEnvironment, resolveNpmRegistry } from './desktop-release-environment.mjs'
 import { resolveDesktopAutoUpdateConfig } from './desktop-auto-update-environment.mjs'
 import { createWindowsTokenSigner } from './windows-sign.mjs'
-import { resolvePrivateUpdateFeed } from './private-update-feed.mjs'
 import { validateMacOSSignatureCacheDirectory } from './macos-signature-cache-directory.mjs'
 import { resolveMacOSPackageSettings } from './macos-package-settings.mjs'
 import { resolveWindowsSignatureCacheDirectory } from './windows-signature-cache-directory.mjs'
@@ -121,7 +120,6 @@ export function validateDesktopPackageEnvironment(environment, target, options =
   resolveDesktopTargetBuildPaths(environment, target.platform, target.arch)
   resolveDesktopAppId(environment)
   resolveNpmRegistry(environment)
-  resolvePrivateUpdateFeed(environment, target.platform)
   if (target.platform === 'darwin') resolveMacOSPackageSettings(environment)
   else resolveWindowsPackageSettings(environment)
   if (options.unsigned) return
