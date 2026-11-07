@@ -161,7 +161,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 }[T]
 ```
 
-Sources: [`packages/core/session/src/types.ts:439`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:447`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:470`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:501`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:452`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:460`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:483`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:514`](../packages/core/session/src/types.ts)
 
 ## Events
 
@@ -887,18 +887,22 @@ Source: [`packages/session/session-title-llm/src/index.ts:63`](../packages/sessi
 #### `session-log-deepseek/delivery-accepted` — log-only
 
 ```ts persistence-catalog
-/** Records that the configured endpoint accepted one delivery through `throughSeq`. */
+/**
+ * Records that a configured endpoint accepted one Session-log delivery
+ * through `throughSeq`. No plugin in this private distribution appends it;
+ * the declaration stays so Sessions written by upstream builds keep loading.
+ */
 'session-log-deepseek/delivery-accepted': {
   /** Session identity the accepted delivery carried; inherited fork markers retain the parent's id. */
-  sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+  sessionId: SessionId
   /** Accepted Session format generation; absence identifies version 0. */
   sessionFormatVersion?: number
   /** Last canonical event included in the accepted request. */
-  throughSeq: import('@deepseek-ai/dsh-session/types').SessionSeq
+  throughSeq: SessionSeq
 }
 ```
 
-Source: [`packages/session/session-log-deepseek/src/types.ts:96`](../packages/session/session-log-deepseek/src/types.ts)
+Source: [`packages/core/session/src/types.ts:441`](../packages/core/session/src/types.ts)
 
 ### `step/*`
 
@@ -4960,7 +4964,7 @@ Sources: [`packages/subagent/subagent/src/continuation-messages.ts:29`](../packa
 
 SHA-256: `335e242de1fcc17b6ca920fc420d71bec2d76e53e37955c00948b65ab77f05c5`
 
-Sources: [`packages/core/session/src/types.ts:470`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:483`](../packages/core/session/src/types.ts)
 
 One of:
 
@@ -6357,7 +6361,7 @@ Sources: [`packages/compaction/compaction/src/types.ts:38`](../packages/compacti
 
 SHA-256: `bcf0caf62d964b2fcf5404bd5c909cfa9a21c3f3c96e6b7e36d9e33565223825`
 
-Sources: [`packages/core/session/src/types.ts:472`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:485`](../packages/core/session/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -8098,7 +8102,7 @@ Sources: [`packages/web/web-search-deepseek/src/provider.ts:64`](../packages/web
 
 SHA-256: `8bb8c3751a6ce64b61aba1ec7ae798c00a5803c4d868a0430873216c6569ed52`
 
-Sources: [`packages/session/session-log-deepseek/src/types.ts:96`](../packages/session/session-log-deepseek/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:441`](../packages/core/session/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|

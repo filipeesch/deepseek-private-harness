@@ -54,15 +54,19 @@ export type Config = z.infer<typeof Config>
 ## `@deepseek-ai/dsh-agent-default-model`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/core/agent-default-model/src/index.ts:24`](../packages/core/agent-default-model/src/index.ts)
+- `source`: [`packages/core/agent-default-model/src/index.ts:28`](../packages/core/agent-default-model/src/index.ts)
 
 ```ts config-catalog
-/** Default model selection supplied by plugin configuration. */
+/**
+ * Default model selection supplied by plugin configuration. Provider and model
+ * are both optional: while either is absent no default exists and every
+ * consumer must tolerate that (the user chooses a model before the first request).
+ */
 export interface Config {
   /** Registered provider route. */
-  provider: Volatile<string>
+  provider: Volatile<string | undefined>
   /** Provider-owned model id. */
-  model: Volatile<string>
+  model: Volatile<string | undefined>
   /** Adapter-owned reasoning effort; omission follows the provider default. */
   reasoningEffort: Volatile<string | undefined>
 }
@@ -532,30 +536,6 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-hmr -->
-
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-product-analytics -->
-<a id="deepseek-aidsh-client-product-analytics"></a>
-
-## `@deepseek-ai/dsh-client-product-analytics`
-
-- `inject`: `deepseekAccount` · `productTelemetry`
-- `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/client/product-analytics/src/index.ts:15`](../packages/client/product-analytics/src/index.ts)
-
-```ts config-catalog
-/** Application-owned collection policy; no user settings surface. */
-export interface Config {
-  /** Live application collection policy; ordinary Web does not mount this service. */
-  enabled: Volatile<boolean>
-  /** Running Desktop release, absent when unavailable. */
-  appVersion?: string
-  /** Maximum execution time per static environment query, in milliseconds. */
-  environmentQueryTimeoutMillis: number
-  /** Maximum captured bytes per environment query output stream. */
-  environmentQueryMaxOutputBytes: number
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-product-analytics -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-shortcuts -->
 <a id="deepseek-aidsh-client-shortcuts"></a>
@@ -1790,43 +1770,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-open-in-app -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-host-product-telemetry-otel -->
-<a id="deepseek-aidsh-host-product-telemetry-otel"></a>
-
-## `@deepseek-ai/dsh-host-product-telemetry-otel`
-
-- `inject`: `otel`
-- `source`: [`packages/host/product-telemetry-otel/src/index.ts:18`](../packages/host/product-telemetry-otel/src/index.ts)
-
-```ts config-catalog
-/** Collector routing, application identity, and bounded in-memory batch settings. */
-export interface Config {
-  /** Full HTTP(S) logs URL. */
-  endpoint: string
-  /** Collector routing header. */
-  channel: string
-  /** Resource service.name supplied by the application composition. */
-  serviceName: string
-  /** Resource service.version supplied by the application composition. */
-  serviceVersion: string
-  /** Omit to honor OTEL_EXPORTER_OTLP_LOGS_COMPRESSION / OTEL_EXPORTER_OTLP_COMPRESSION. */
-  compression?: 'none' | 'gzip'
-  /** Maximum records per export; must not exceed maxQueueSize. */
-  maxExportBatchSize: number
-  /** Maximum queued records; the SDK drops new records when full. */
-  maxQueueSize: number
-  /** Delay before exporting a partial batch. */
-  scheduledDelayMillis: number
-  /** Exporter HTTP deadline, including SDK transient-error retries. */
-  timeoutMillis: number
-  /** Processor deadline for one batch export. */
-  exportTimeoutMillis: number
-  /** Drain deadline; expiry cancels pending exports before disposal completes. */
-  shutdownTimeoutMillis: number
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-product-telemetry-otel -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-host-webserver -->
 <a id="deepseek-aidsh-host-webserver"></a>
 
@@ -2759,23 +2702,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-plugin-market -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-plugin-package-inventory-deepseek -->
-<a id="deepseek-aidsh-plugin-package-inventory-deepseek"></a>
-
-## `@deepseek-ai/dsh-plugin-package-inventory-deepseek`
-
-- `inject`: `agents` · `deepseekLlmApiExtensions` · `loader`
-- `source`: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:32`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
-
-```ts config-catalog
-/** Plugin-package request contribution configuration. */
-export interface Config {
-  /** Contribute `dsh_plugin_packages` to official DeepSeek requests. Defaults to `true`. */
-  enabled?: boolean
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-plugin-package-inventory-deepseek -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-ptc-runtime-node -->
 <a id="deepseek-aidsh-ptc-runtime-node"></a>
 
@@ -3064,30 +2990,6 @@ export interface JsonRpcConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-sdk-jsonrpc-server -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->
-<a id="deepseek-aidsh-session-log-deepseek"></a>
-
-## `@deepseek-ai/dsh-session-log-deepseek`
-
-- `inject`: `deepseekLlmApiExtensions` · `sessions`
-- `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/session/session-log-deepseek/src/index.ts:47`](../packages/session/session-log-deepseek/src/index.ts)
-
-```ts config-catalog
-/** Session-log request contribution configuration. */
-export interface Config {
-  /** Contribute `dsh_session_log` to official DeepSeek requests. Defaults to `true`. */
-  enabled: Volatile<boolean>
-  /**
-   * Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries.
-   * A request uploads the longest pending event prefix that fits; later requests continue
-   * after its acceptance. Defaults to 8 MiB.
-   */
-  maxBytes: number
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-log-export -->
 <a id="deepseek-aidsh-session-log-export"></a>
 
@@ -3236,53 +3138,6 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-reference -->
-
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-telemetry-otel -->
-<a id="deepseek-aidsh-session-telemetry-otel"></a>
-
-## `@deepseek-ai/dsh-session-telemetry-otel`
-
-- `inject`: `sessions` · `otel`
-- `refs`: [`LogExporterOptions`](../packages/telemetry/otel/src/index.ts) · [`SessionLogProcessorOptions`](../packages/telemetry/otel/src/index.ts)
-- `source`: [`packages/session/session-telemetry-otel/src/index.ts:85`](../packages/session/session-telemetry-otel/src/index.ts)
-
-```ts config-catalog
-/**
- * Plugin configuration: sharing policy, SDK transport options, byte/count queue
- * settings, and an overall shutdown bound. Uploading modes validate their endpoint
- * and shutdown deadline at plugin load; `DISABLED` reads neither.
- */
-export interface Config {
-  /** Defaults to `FEEDBACK_ONLY`: capture session history only when feedback is explicitly submitted. */
-  mode?: SessionTelemetryMode
-  /**
-   * Explicit SDK HTTP transport settings, including optional routing headers.
-   * Ambient credentials are not inherited. URL is required while uploading.
-   * Exporter self-observability metering is not supported.
-   */
-  exporter?: Omit<LogExporterOptions, 'url'> & {
-    /** Full logs endpoint (e.g. `https://collector.example.com/v1/logs`). Required outside `DISABLED`; validated at load. */
-    url?: string
-  }
-  /**
-   * Count, queue, cadence, and per-request watchdog settings for the byte-bounded
-   * processor. A watchdog warning never releases an unsettled transport slot.
-   * SDK processor self-observability metering is not supported.
-   */
-  processor?: SessionLogProcessorOptions
-  /** Maximum time spent awaiting the SDK provider's complete shutdown path. */
-  shutdownTimeoutMillis?: number
-  /** Uncompressed OTLP request byte limit, at most 4,000,000. */
-  maxRequestBytes?: number
-}
-
-/** Session-sharing policy selected by {@link Config.mode}. */
-export enum SessionTelemetryMode {
-  FEEDBACK_ONLY = 'FEEDBACK_ONLY',
-  DISABLED = 'DISABLED',
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-telemetry-otel -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-title -->
 <a id="deepseek-aidsh-session-title"></a>
@@ -4699,7 +4554,7 @@ export interface Config {
 
 - `inject`: `web`
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/web/web-deepseek-api/src/index.ts:58`](../packages/web/web-deepseek-api/src/index.ts)
+- `source`: [`packages/web/web-deepseek-api/src/index.ts:57`](../packages/web/web-deepseek-api/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -4717,8 +4572,6 @@ export interface Config {
    * share the account limit without coordination. Defaults to 5.
    */
   searchRequestsPerSecond: Volatile<number>
-  /** Send the triggering user question, bounded to 128 characters, as `ori_question`. Defaults to true. */
-  sendOriginalQuestion: Volatile<boolean>
   /**
    * Own Search API base including its path prefix; `/search` is appended. With only {@link searchApiKeyEnv} set, the
    * official base applies.
@@ -4942,7 +4795,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-settings-general` | — | [`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` | — | [`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-plugins` | — | [`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts) |
-| `@deepseek-ai/dsh-client-ui-settings-session-log` | — | [`packages/client/ui-settings-session-log/src/index.ts`](../packages/client/ui-settings-session-log/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-shell` | — | [`packages/client/ui-settings-shell/src/index.ts`](../packages/client/ui-settings-shell/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-subagent` | — | [`packages/client/ui-settings-subagent/src/index.ts`](../packages/client/ui-settings-subagent/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-web-search` | — | [`packages/client/ui-settings-web-search/src/index.ts`](../packages/client/ui-settings-web-search/src/index.ts) |
@@ -4988,7 +4840,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-lsp` | — | [`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts) |
 | `@deepseek-ai/dsh-mcp-resources` | `tools` | [`packages/mcp/mcp-resources/src/index.ts`](../packages/mcp/mcp-resources/src/index.ts) |
 | `@deepseek-ai/dsh-message-quotes` | — | [`packages/session/message-quotes/src/index.ts`](../packages/session/message-quotes/src/index.ts) |
-| `@deepseek-ai/dsh-otel` | — | [`packages/telemetry/otel/src/index.ts`](../packages/telemetry/otel/src/index.ts) |
 | `@deepseek-ai/dsh-plugin-recommendations` | `pluginManager` · `agents` · `skills` · `actionCards` | [`packages/experimental/plugin-recommendations/src/index.ts`](../packages/experimental/plugin-recommendations/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox-ssh` | `ssh` | [`packages/ssh/sandbox-ssh/src/index.ts`](../packages/ssh/sandbox-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-session` | — | [`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts) |
@@ -5046,7 +4897,6 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `package` | `inject` | `source` |
 | --- | --- | --- |
 | `@deepseek-ai/dsh-agent-loop-testkit` | — | [`packages/test-support/agent-loop-testkit/src/index.ts`](../packages/test-support/agent-loop-testkit/src/index.ts) |
-| `@deepseek-ai/dsh-anonymous-user-id` | — | [`packages/identity/anonymous-user-id/src/index.ts`](../packages/identity/anonymous-user-id/src/index.ts) |
 | `@deepseek-ai/dsh-app-boot` | — | [`packages/boot/app-boot/src/index.ts`](../packages/boot/app-boot/src/index.ts) |
 | `@deepseek-ai/dsh-atomic-write` | — | [`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts) |
 | `@deepseek-ai/dsh-base` | — | [`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts) |
@@ -5105,7 +4955,6 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-session-format-v2-to-v3` | — | [`packages/session/session-format-v2-to-v3/src/index.ts`](../packages/session/session-format-v2-to-v3/src/index.ts) |
 | `@deepseek-ai/dsh-session-format-v3-to-v4` | — | [`packages/session/session-format-v3-to-v4/src/index.ts`](../packages/session/session-format-v3-to-v4/src/index.ts) |
 | `@deepseek-ai/dsh-session-snapshot` | — | [`packages/test-support/session-snapshot/src/index.ts`](../packages/test-support/session-snapshot/src/index.ts) |
-| `@deepseek-ai/dsh-session-telemetry` | — | [`packages/session/session-telemetry/src/index.ts`](../packages/session/session-telemetry/src/index.ts) |
 | `@deepseek-ai/dsh-session-title-llm` | — | [`packages/session/session-title-llm/src/index.ts`](../packages/session/session-title-llm/src/index.ts) |
 | `@deepseek-ai/dsh-ssh-helper-runtime` | — | [`packages/ssh/ssh-helper-runtime/src/index.ts`](../packages/ssh/ssh-helper-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-timeout` | — | [`packages/util/timeout/src/index.ts`](../packages/util/timeout/src/index.ts) |

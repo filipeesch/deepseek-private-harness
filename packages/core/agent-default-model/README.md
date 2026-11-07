@@ -29,7 +29,7 @@ Mount this package wherever agents are created without an explicit model route. 
 
 ### Configure the default
 
-The composition requires a provider and model. Consumers read the live references even when no configuration editor is mounted.
+Provider and model are optional: while either is absent no default exists, and a Session that records no selection has no model until the user chooses one. Consumers read the live references even when no configuration editor is mounted.
 
 ```yaml
 - name: '@deepseek-ai/dsh-agent-default-model'
@@ -40,14 +40,14 @@ The composition requires a provider and model. Consumers read the live reference
 
 | Field | Default | Meaning |
 |---|---|---|
-| `provider` | required | Registered provider route for fresh agents |
-| `model` | required | Provider-owned model id for fresh agents |
+| `provider` | none | Registered provider route for fresh agents |
+| `model` | none | Provider-owned model id for fresh agents |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model) lists every accepted field. `reasoningEffort` is optional; saving a selection without it removes that field from the profile’s complete config override.
 
 ### Read and change the default
 
-`currentSelection()` returns a detached `{ provider, model, reasoningEffort? }` for a newly created agent; `saveSelection()` stores the complete selection for later agents.
+`currentSelection()` returns a detached `{ provider, model, reasoningEffort? }` for a newly created agent, or `undefined` while no default is configured; `saveSelection()` stores the complete selection for later agents.
 
 ```text
 const selection = ctx.agentDefaultModel.currentSelection()
