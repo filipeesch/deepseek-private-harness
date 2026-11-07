@@ -1,5 +1,11 @@
 # Live-recording patch: the search key reference names no credential, so the
 # model request withholds web_search while the rest of the tool surface stays.
+- id: web
+  config:
+    # The shipped base selects no search provider; this scenario exercises the DeepSeek Search API.
+    searchProvider: deepseek-search-api
+    fetchProvider: http
+
 - id: web-deepseek-api
   name: '@deepseek-ai/dsh-web-deepseek-api'
   config:

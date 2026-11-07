@@ -363,6 +363,11 @@ async function run(ctx: Context, config: Config, io: HeadlessIo): Promise<void> 
   }
 
   const selection = defaultModel.currentSelection()
+  // The private distribution ships no default model. A resumed Session keeps its
+  // recorded selection; a new one cannot run until the user chooses a model.
+  if (selection === undefined && config.sessionId === undefined) {
+    throw new Error('headless: no model is selected; set provider and model on the agent-default-model row in your profile patch or a --patch overlay')
+  }
   const agentOptions: AgentOptions = { ...selection }
   // This bundle composes no preset roster, so the model-facing rows sit in the
   // host plane and the agent reads them from the global layer. A deployment
@@ -370,7 +375,7 @@ async function run(ctx: Context, config: Config, io: HeadlessIo): Promise<void> 
   // (@deepseek-ai/dsh-agent-preset-registry README, "Composing a child agent").
   const setup = (agentCtx: Context, agent: Agent): void => {
     // A resumed Session continues with this run's configured model.
-    if (config.sessionId !== undefined) {
+    if (config.sessionId !== undefined && selection !== undefined) {
       const previous = agent.model.current()
       const configured = { ...selection }
       if (configured.reasoningEffort === undefined && previous !== undefined

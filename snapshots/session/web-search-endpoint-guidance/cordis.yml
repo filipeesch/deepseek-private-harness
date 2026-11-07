@@ -3,6 +3,12 @@
     - id: web-search-error-fixture
       name: './web-search-error-fixture.mjs'
 
+- id: web
+  config:
+    # The shipped base selects no search provider; this scenario exercises the DeepSeek Search API.
+    searchProvider: deepseek-search-api
+    fetchProvider: http
+
 - id: web-deepseek-api
   name: '@deepseek-ai/dsh-web-deepseek-api'
   config:

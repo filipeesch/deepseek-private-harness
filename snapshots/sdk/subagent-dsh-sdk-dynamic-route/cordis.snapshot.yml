@@ -21,6 +21,8 @@
       config:
         maxTokensAsSuccess: true
 
-- id: session-log-deepseek
+- id: web
   config:
-    enabled: false
+    # The shipped base selects no search provider; this scenario was recorded with the DeepSeek Search API selected.
+    searchProvider: deepseek-search-api
+    fetchProvider: http

@@ -20,12 +20,16 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Default model selection supplied by plugin configuration. */
+/**
+ * Default model selection supplied by plugin configuration. Provider and model
+ * are both optional: while either is absent no default exists and every
+ * consumer must tolerate that (the user chooses a model before the first request).
+ */
 export interface Config {
   /** Registered provider route. */
-  provider: Volatile<string>
+  provider: Volatile<string | undefined>
   /** Provider-owned model id. */
-  model: Volatile<string>
+  model: Volatile<string | undefined>
   /** Adapter-owned reasoning effort; omission follows the provider default. */
   reasoningEffort: Volatile<string | undefined>
 }
@@ -49,8 +53,8 @@ export class AgentDefaultModelConfig extends Service {
   private saves: Promise<void> = Promise.resolve()
 
   static Config = z.object({
-    provider: z.string().required().volatile(),
-    model: z.string().required().volatile(),
+    provider: z.string().volatile(),
+    model: z.string().volatile(),
     reasoningEffort: z.string().volatile(),
   })
 
@@ -62,12 +66,15 @@ export class AgentDefaultModelConfig extends Service {
 
   /**
    * Read the current default model selection.
-   * @returns a detached provider, model, and optional reasoning selection.
+   * @returns a detached provider, model, and optional reasoning selection, or `undefined` while no default is configured.
    */
-  currentSelection(): ModelSelection {
+  currentSelection(): ModelSelection | undefined {
+    const provider = this.config.provider.get()
+    const model = this.config.model.get()
+    if (provider === undefined || provider === '' || model === undefined || model === '') return undefined
     const reasoningEffort = this.config.reasoningEffort.get()
     return selection({
-      provider: this.config.provider.get(), model: this.config.model.get(),
+      provider, model,
       ...reasoningEffort === undefined ? {} : { reasoningEffort },
     })
   }
