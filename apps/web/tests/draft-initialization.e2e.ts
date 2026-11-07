@@ -213,7 +213,7 @@ async function assertUnsubmitted(scaffold: WebScaffold, ids: readonly SessionId[
 async function launchDraftFixture(beforeBrowserOpen?: (page: Page, scaffold: WebScaffold) => Promise<void>) {
   const scaffold = await launchWebScaffold()
   onTestFinished(() => scaffold.close())
-  const first = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd, 'Draft origin')
+  const first = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd, { title: 'Draft origin' })
   const browser = await chromium.launch()
   onTestFinished(() => browser.close())
   const page = await newEnglishPage(browser)
@@ -242,7 +242,7 @@ async function launchDraftFixture(beforeBrowserOpen?: (page: Page, scaffold: Web
   const firstId = first.sessionIds[0]!
   await expect.poll(() => selectedSession(page), SETTLE).toBe(firstId)
   const secondPath = await mkdtemp(join(scaffold.workspaceCwd, 'draft-target-'))
-  const second = await scaffold.ctx.workspaceRegistry.create(secondPath, 'Draft target')
+  const second = await scaffold.ctx.workspaceRegistry.create(secondPath, { title: 'Draft target' })
   await page.getByText('Draft target', { exact: true }).first().waitFor()
   expect(second.sessionIds).toEqual([])
   return { scaffold, page, console, first, firstId, second }
@@ -664,7 +664,7 @@ it.each(['older-first', 'newer-first'] as const)(
   'initializes only the latest target when two real Session creations overlap (%s)', async (completionOrder) => {
     const { scaffold, page, console, first, firstId, second } = await launchDraftFixture()
     const thirdPath = await mkdtemp(join(scaffold.workspaceCwd, 'draft-latest-'))
-    const third = await scaffold.ctx.workspaceRegistry.create(thirdPath, 'Draft latest')
+    const third = await scaffold.ctx.workspaceRegistry.create(thirdPath, { title: 'Draft latest' })
     await page.getByText(third.title, { exact: true }).first().waitFor()
     const source = structuredDraft(firstId, '交错请求的源草稿')
     const latest = { text: '只有最后目标收到文字草稿 🧭', references: [] }

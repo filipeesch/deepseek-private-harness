@@ -99,12 +99,20 @@ export class WorkspaceEntity implements Workspace {
     return this.record.updatedAt
   }
 
+  get hidden(): boolean {
+    return this.record.hidden
+  }
+
   get sessionIds(): readonly SessionId[] {
     return this.record.sessionIds.filter(id => this.host.candidateMatches(id, this.record.path))
   }
 
   async setTitle(title: string): Promise<void> {
     await this.mutate(record => ({ ...record, title }))
+  }
+
+  async setHidden(hidden: boolean): Promise<void> {
+    await this.mutate(record => record.hidden === hidden ? record : { ...record, hidden })
   }
 
   async attachSession(sessionId: SessionId): Promise<void> {
@@ -211,7 +219,7 @@ export class WorkspaceEntity implements Workspace {
         if (changed === current && sessionIds.length === current.sessionIds.length) {
           throw unchangedSentinel
         }
-        return { ...changed, sessionIds, updatedAt: new Date().toISOString() }
+        return { ...changed, sessionIds, updatedAt: nextUpdatedAt(current.updatedAt) }
       })
     } catch (error) {
       if (error === unchangedSentinel) return
@@ -219,4 +227,18 @@ export class WorkspaceEntity implements Workspace {
     }
     this.record = next
   }
+}
+
+/**
+ * Stamp of the mutation being written: strictly later than the record's
+ * previous instant, so two mutations in the same millisecond cannot tie.
+ * Consumers compare rows by this value, and a tie would let a delayed
+ * projection of an older mutation outrank a newer one.
+ * @param previous - the record's current `updatedAt`.
+ * @returns an ISO-8601 instant later than `previous`, or the current instant when it is unparsable.
+ */
+function nextUpdatedAt(previous: string): string {
+  const now = Date.now()
+  const last = Date.parse(previous)
+  return new Date(Number.isNaN(last) ? now : Math.max(now, last + 1)).toISOString()
 }

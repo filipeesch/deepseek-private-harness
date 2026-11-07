@@ -24,6 +24,7 @@ import type { DraftInitializationOptions } from '@deepseek-ai/dsh-client-ui-conv
 import type { RowToast } from './contract/slots.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import type { WorkspaceViewStoreActions } from './stores.ts'
+import { workspaceVisibility } from './tree.ts'
 
 interface MainSelection {
   readonly sessionId?: SessionId
@@ -183,6 +184,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
    * @param sessions - pure Session Controller.
    * @param view - the browser's viewing-store write set (one instance shared with its registration).
    * @param notify - show one notice through the Workspace notice channel.
+   * @param showHiddenWorkspaces - read the browser's current reveal choice.
    */
   constructor(
     ctx: Context,
@@ -191,6 +193,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     private readonly sessions: ISessions,
     private readonly view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder'>,
     private readonly notify: (toast: RowToast) => void,
+    private readonly showHiddenWorkspaces: () => boolean,
   ) {
     super(ctx, 'uiWorkspace')
     ctx.effect(() => {
@@ -207,6 +210,17 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   connectWorkspace(workspaceId: WorkspaceId, options: Pick<StartSessionOptions, 'agentPreset'> = {}): Promise<SessionId> {
     return this.connectBlank(workspaceId, options)
+  }
+
+  /**
+   * Workspaces a new Session may fall back to: a hidden one is eligible only
+   * while this browser reveals hidden Workspaces. An explicit target never
+   * passes through here.
+   * @param items - complete Workspace projection.
+   * @returns the eligible Workspaces in registry order.
+   */
+  private choiceWorkspaces(items: readonly WorkspaceView[]): readonly WorkspaceView[] {
+    return workspaceVisibility(items, this.showHiddenWorkspaces(), undefined).choices
   }
 
   /**
@@ -346,7 +360,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       ? undefined
       : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
     const recent = workspace.phase === 'ready' && sessions.phase === 'ready'
-      ? recentWorkspace(workspace.items, sessions.byId)
+      ? recentWorkspace(this.choiceWorkspaces(workspace.items), sessions.byId)
       : undefined
     const target = workspaceId ?? currentWorkspaceId ?? recent
     if (target === undefined) {
@@ -482,7 +496,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       && !workspaces.archivedSessionIds.includes(summary.id)) {
       sessionId = await this.restoreBlank(workspace.workspaceId, summary.id)
     }
-    let target = workspace?.workspaceId ?? recentWorkspace(workspaces.items, sessions.byId)
+    let target = workspace?.workspaceId ?? recentWorkspace(this.choiceWorkspaces(workspaces.items), sessions.byId)
     if (target === undefined && workspaces.items.length === 0 && sessions.ids.length === 0) {
       const prepared = await this.initializeDefaultWorkspace(navigation)
       if (navigation.aborted) return

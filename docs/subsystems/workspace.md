@@ -47,8 +47,20 @@ interface Workspace {
   /** ISO-8601 creation instant, stamped at create and never rewritten. */
   readonly createdAt: string
 
-  /** ISO-8601 instant of the last durable mutation (create counts as one). */
+  /**
+   * ISO-8601 instant of the last durable mutation (create counts as one). Each
+   * accepted mutation stamps a strictly later instant than the previous one,
+   * so two writes cannot tie.
+   */
   readonly updatedAt: string
+
+  /**
+   * Whether browsing surfaces omit this Workspace together with its Sessions.
+   * Presentation only: a hidden Workspace still accepts Sessions, renames, and
+   * reads exactly as a visible one, and nothing outside the browser consults
+   * the flag.
+   */
+  readonly hidden: boolean
 
   /**
    * Header-validated sessions in manually owned order: a new session is
@@ -69,6 +81,15 @@ interface Workspace {
    * @returns resolution after durability.
    */
   setTitle(title: string): Promise<void>
+
+  /**
+   * Replace the hidden flag durably. Setting the value it already has resolves
+   * without a durable write, aside from the durable filtered-candidate prune
+   * every accepted mutation performs.
+   * @param hidden - `true` to omit this Workspace from browsing surfaces.
+   * @returns resolution after durability.
+   */
+  setHidden(hidden: boolean): Promise<void>
 
   /**
    * Prepend a session to this workspace's candidate account. An already
@@ -119,9 +140,11 @@ interface Workspace {
 
 Ownership truth is the record's ordered `sessionIds`, never derived from session cwd. Membership validates the recorded header cwd against the workspace path; an existing candidate remains owned when its fully qualified cwd fails resolution or directory stat with `ENOENT`. This preserves missing-directory and dangling-symlink accounts without admitting new sessions. Failed writes reject (`insertSessionBefore` account errors as `WorkspaceMoveInvalidError`, storage failures as plain errors); every accepted mutation stamps `updatedAt` and durably prunes candidates that no longer pass the membership check.
 
+The hidden flag is an attribute of the record, set through `setHidden` on the entity or through `create` when the record is new. Nothing outside the browser consults it: the registry, the Session controller, and the API gateway treat a hidden Workspace exactly like a visible one, and the only observable difference is that browser surfaces omit it and its Sessions until the reader reveals them. The [web client](web-client.md) owns that behavior.
+
 ## The registry: `ctx.workspaceRegistry`
 
-`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` requires a fully qualified path, canonicalizes it, rejects a nonexistent path (the original `ENOENT`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? defaultWorkspaceTitle(path)` prepended to the durable registry order (different canonical paths may share a display title, and a path with no final segment uses its root spelling). `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same fully qualified realpath canon without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([reference](../../packages/workspace/workspace/README.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
+`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, options?)` requires a fully qualified path, canonicalizes it, rejects a nonexistent path (the original `ENOENT`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record prepended to the durable registry order with `options.title ?? defaultWorkspaceTitle(path)` and `options.hidden === true` (different canonical paths may share a display title, and a path with no final segment uses its root spelling). Creation options apply only to a new record: resolving an already-registered directory leaves its title and hidden flag untouched. `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same fully qualified realpath canon without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([reference](../../packages/workspace/workspace/README.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
 
 Sessions get their cwd at create time from whoever creates them, not from this registry — the API gateway resolves a new session's cwd from the chosen workspace's `path` (falling back to an explicit or default cwd), creates the session so the cwd lands in its immutable [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log), then calls `attachSession`, which re-validates that stored header cwd against the workspace path. On the first successful start, the registry bootstraps history from persisted headers alone (`id`, `cwd`, `createdAt` — never event bodies), grouping sessions with a valid canonical cwd into per-directory workspaces, newest first; the initialized marker is written last so an interrupted bootstrap resumes safely. The bootstrap is one-time: cwd-less legacy sessions stay Ungrouped, and sessions created afterwards join a workspace only through `attachSession`.
 
@@ -338,6 +361,16 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('rename') rename(request: WorkspaceRenameRequest): Promise<WorkspaceValue>
 
 /**
+ * Mark one Workspace hidden from browsing surfaces, or show it again. The
+ * response arrives once the change is durable; an unknown identity fails as
+ * `workspace/not-found` without writing. The flag is presentation only:
+ * Sessions, files, directory, and every other verb are unaffected.
+ * @param request - Workspace identity and the requested flag.
+ * @returns the updated Workspace projection.
+ */
+@Remote('setHidden') setHidden(request: WorkspaceSetHiddenRequest): Promise<WorkspaceValue>
+
+/**
  * Remove one Workspace registration while retaining files and Sessions.
  * @param request - Workspace identity to remove.
  * @returns deletion confirmation.
@@ -472,14 +505,14 @@ Durable workspace registry. Startup waits for `sessionPersistence`, builds one c
  * Create or reuse a workspace for an existing directory. The fully qualified
  * path is canonicalized through `fs.realpath`; a relative, nonexistent, or
  * non-directory path rejects. Repeated calls for the same canonical path
- * return the existing entity without changing its title.
+ * return the existing entity without changing its title or hidden flag.
  * A newly created workspace is prepended to the durable registry order.
  * Different canonical paths may share a display title.
  * @param path - Existing directory to own, in a fully qualified path spelling.
- * @param title - Display title used only when a new record is created.
+ * @param options - Title and hidden flag used only when a new record is created.
  * @returns the existing or newly durable workspace.
  */
-async create(path: string, title?: string): Promise<Workspace>
+async create(path: string, options: CreateWorkspaceOptions = {}): Promise<Workspace>
 
 /**
  * Initialize the default Workspace only while both the registry and Session

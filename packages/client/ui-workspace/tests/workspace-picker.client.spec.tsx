@@ -29,12 +29,14 @@ const wid = (id: string) => id as WorkspaceId
 function workspace(id: string, title = id): WorkspaceView {
   return {
     workspaceId: wid(id), path: `/projects/${id}`, title, sessionIds: [],
-    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', hidden: false,
   }
 }
 function hook<T>(snapshot: T) {
   return function select<S>(selector: (state: T) => S): S { return selector(snapshot) }
 }
+/** No fixture hides a Workspace, so the picker offers every row it lists. */
+const revealAll = hook(false)
 const sessions: SessionListState = {
   ids: [], byId: {}, phase: 'ready', projectionsBySession: {},
 }
@@ -89,6 +91,7 @@ function mount(
   items: readonly WorkspaceView[] = [workspace('alpha', 'Alpha')],
   createWorkspace = vi.fn(),
   occupancy = occupancySource(),
+  showHiddenWorkspaces = false,
 ) {
   const onPick = vi.fn()
   const onClose = vi.fn()
@@ -103,6 +106,7 @@ function mount(
       useSessionRetainInfo={() => undefined}
       usePanelInfo={usePanelInfo} useContextMenu={contextMenuHook()} useResource={useResource}
       useWorkspaces={hook(workspaceState(nextItems))}
+      useShowHiddenWorkspaces={hook(showHiddenWorkspaces)}
       {...allowAllAccess}
       onPick={onPick}
       onClose={onClose}
@@ -139,6 +143,26 @@ describe('WorkspacePicker', () => {
     expect(screen.getByRole('menuitem', { name: 'Alone' }).querySelector('[title]')).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Shared two/a/Shared' }))
     expect(b.onPick).toHaveBeenCalledWith(wid('beta'))
+  })
+
+  it('offers hidden Workspaces only while this browser reveals them', () => {
+    const hidden = { ...workspace('hidden', 'Hidden project'), hidden: true }
+    const first = mount([workspace('alpha', 'Alpha'), hidden])
+    expect(screen.getAllByRole('menuitem').map(entry => entry.textContent))
+      .toEqual(['Alpha', '添加工作区…'])
+    first.view.unmount()
+
+    mount([workspace('alpha', 'Alpha'), hidden], vi.fn(), occupancySource(), true)
+    expect(screen.getAllByRole('menuitem').map(entry => entry.textContent))
+      .toEqual(['Alpha', 'Hidden project', '添加工作区…'])
+  })
+
+  it('keeps the add action reachable when every listed Workspace is hidden', () => {
+    // Adding is then the only entry left, so the anchor gesture raises it.
+    const b = mount([{ ...workspace('hidden', 'Hidden project'), hidden: true }])
+    expect(screen.queryByText('Hidden project')).toBeNull()
+    expect(b.onClose).toHaveBeenCalled()
+    expect(screen.getByTestId('directory-flow')).toBeTruthy()
   })
 
   it('opens the composed directory flow, adopts its picked path, and selects the returned Workspace', async () => {
@@ -230,6 +254,7 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         open useSessions={hook(sessions)} useWorkspaces={hook(workspaceState([workspace('alpha', 'Alpha')]))}
+        useShowHiddenWorkspaces={revealAll}
         useSessionStatus={hook(noPendingInteraction)}
         useSessionRetainInfo={() => undefined}
         usePanelInfo={usePanelInfo} useContextMenu={contextMenuHook()} useResource={useResource}
@@ -249,6 +274,7 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         open anchorRef={anchor()} useSessions={hook(sessions)} useWorkspaces={hook(state)}
+        useShowHiddenWorkspaces={revealAll}
         useSessionStatus={hook(noPendingInteraction)}
         useSessionRetainInfo={() => undefined}
         usePanelInfo={usePanelInfo} useContextMenu={contextMenuHook()} useResource={useResource}

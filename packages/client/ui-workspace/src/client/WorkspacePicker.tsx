@@ -20,6 +20,7 @@ import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
 import { distinguishingPathSuffixes } from './path-suffix.ts'
+import { workspaceVisibility } from './tree.ts'
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
@@ -48,6 +49,8 @@ export interface WorkspacePickFlowProps {
   onBusyChange?: (busy: boolean) => void
   /** Only offer the add action, hide existing workspaces. */
   addOnly?: boolean
+  /** Whether this browser reveals hidden Workspaces; they are offered only then. */
+  showHiddenWorkspaces: boolean
   /** Menu opening direction relative to the anchor. */
   side?: 'bottom' | 'top' | 'right'
   /** Currently active workspace (trailing check in the picker list). */
@@ -70,6 +73,7 @@ export function WorkspacePickFlow({
   onPick,
   onClose,
   addOnly = false,
+  showHiddenWorkspaces,
   onBusyChange,
   side = 'bottom',
   selectedId,
@@ -105,22 +109,29 @@ export function WorkspacePickFlow({
   const addEntries: MenuEntry[] = flowAvailable
     ? [{ id: ADD_WORKSPACE, label: t('menu.addWorkspace'), icon: <IconPlusOutlineRegular size={16} />, disabled: flowBusy }]
     : []
+  // Hidden Workspaces are offered only while this browser reveals them, through
+  // the same projection the sidebar and navigation use.
+  const offered = useMemo(
+    () => workspaceVisibility(workspaces, showHiddenWorkspaces, undefined).choices,
+    [showHiddenWorkspaces, workspaces],
+  )
   // With workspaces listed, the add action pins below the scroll region
-  // (divider + always visible); otherwise it IS the menu.
-  const pinAdd = !addOnly && workspaces.length > 0
+  // (divider + always visible); otherwise it IS the menu. An omitted
+  // Workspace contributes no row, so it must not pin the add action either.
+  const pinAdd = !addOnly && offered.length > 0
   // The resolved name, not `t`, is the memo dependency: the bound seat keeps
   // its identity across a language switch.
   const defaultWorkspaceName = t('workspace.defaultName')
   const listed = useMemo(() => {
     if (!pinAdd) return []
-    const rows = workspaces.map(workspace => ({
+    const rows = offered.map(workspace => ({
       id: workspace.workspaceId,
       title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
       path: workspace.path,
     }))
     const suffixes = distinguishingPathSuffixes(rows)
     return rows.map(row => ({ ...row, suffix: suffixes.get(row.id) }))
-  }, [pinAdd, workspaces, defaultWorkspaceName])
+  }, [pinAdd, offered, defaultWorkspaceName])
   const items: MenuEntry[] = pinAdd
     ? listed.map(({ id, title, path, suffix }) => ({
       id,
@@ -258,6 +269,7 @@ export function WorkspacePicker({
   onClose,
   createWorkspace,
   useDirectoryFlow,
+  useShowHiddenWorkspaces,
   renderSlot,
   t,
 }: WorkspacePickerProps) {
@@ -269,6 +281,7 @@ export function WorkspacePicker({
       useWorkspaces={useWorkspaces}
       createWorkspace={createWorkspace}
       useDirectoryFlow={useDirectoryFlow}
+      showHiddenWorkspaces={useShowHiddenWorkspaces(value => value)}
       renderDirectoryFlow={owner => renderSlot('conversation.hero.workspace.directoryFlow', owner)}
       selectedId={selectedId}
       onPick={onPick}

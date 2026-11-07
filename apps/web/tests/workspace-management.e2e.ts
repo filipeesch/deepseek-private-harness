@@ -653,7 +653,7 @@ describe('web e2e: workspace management (create / rename / grouping / hover affo
       for (const title of ['gamma-ws', 'beta-ws']) {
         const cwd = join(hoverScaffold.workspaceCwd, title)
         await mkdir(cwd, { recursive: true })
-        await hoverScaffold.ctx.workspaceRegistry.create(cwd, title)
+        await hoverScaffold.ctx.workspaceRegistry.create(cwd, { title })
       }
       const sessionId = SessionId('mixed-hover-session')
       await seedSession(hoverScaffold, await readFile(SEED, 'utf8'), sessionId)
@@ -1030,7 +1030,7 @@ describe('web e2e: New Session after an outdated blank cache', () => {
       // Session writes only the checkpoint, leaving the persisted log intact.
       const blank = scaffold.ctx.sessions.prepare(id, { meta: stored.header })
       await scaffold.ctx.sessionProjectionCache.write(blank)
-      const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd, 'New session regression')
+      const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd, { title: 'New session regression' })
       await workspace.attachSession(id)
       browser = await chromium.launch()
       const page = await newEnglishPage(browser)

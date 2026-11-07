@@ -25,6 +25,7 @@ import type {
   WorkspacePinSessionRequest,
   WorkspacePinValue,
   WorkspaceRenameRequest,
+  WorkspaceSetHiddenRequest,
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
@@ -119,6 +120,19 @@ export class WorkspaceController extends TypertRemoteService {
   @Remote('rename')
   rename(request: WorkspaceRenameRequest): Promise<WorkspaceValue> {
     return this.commands.rename(request)
+  }
+
+  /**
+   * Mark one Workspace hidden from browsing surfaces, or show it again. The
+   * response arrives once the change is durable; an unknown identity fails as
+   * `workspace/not-found` without writing. The flag is presentation only:
+   * Sessions, files, directory, and every other verb are unaffected.
+   * @param request - Workspace identity and the requested flag.
+   * @returns the updated Workspace projection.
+   */
+  @Remote('setHidden')
+  setHidden(request: WorkspaceSetHiddenRequest): Promise<WorkspaceValue> {
+    return this.commands.setHidden(request)
   }
 
   /**

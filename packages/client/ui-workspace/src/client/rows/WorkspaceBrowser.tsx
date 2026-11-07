@@ -20,7 +20,7 @@ import { WorkspaceDialogs } from './WorkspaceDialogs.tsx'
 import {
   AnimatedRows, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
   IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
-  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
+  IconFlatListOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular, IconProjectAddOutlineRegular,
   IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
   IconWorkspaceTreeOutlineRegular, Menu, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -35,7 +35,7 @@ import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
   deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
+  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY, workspaceVisibility,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
@@ -203,6 +203,32 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
   )
 }
 
+/**
+ * Reveal control for hidden Workspaces: they stay omitted by default, and one
+ * click shows them everywhere this browser lists Workspaces. The sidebar
+ * renders it only while it has something to reveal or is already revealing.
+ */
+function HiddenWorkspacesControl({ revealed, onToggle, t }: {
+  revealed: boolean
+  onToggle: () => void
+  t: WorkspaceBrowserProps['t']
+}) {
+  const label = revealed ? t('workspace.hideHidden') : t('workspace.showHidden')
+  return (
+    <Tooltip label={label} side="bottom" delayMs={500} portal>
+      <button
+        type="button"
+        className={clsx(css.iconButton, css.wide)}
+        aria-label={label}
+        aria-pressed={revealed}
+        onClick={onToggle}
+      >
+        {revealed ? <IconFolderOpenRegular size={16} /> : <IconFolderCloseRegular size={16} />}
+      </button>
+    </Tooltip>
+  )
+}
+
 /** In-flight root-row drag: source identity plus the current insert marker. */
 interface DragState {
   /** Workspace id, or {@link UNGROUPED_KEY} for the browser-local loose-session account. */
@@ -282,6 +308,8 @@ type SessionTreeProps = Pick<
   setGroupExpanded: (key: string, expanded: boolean) => void
   /** Save a drag order and select Manual. */
   setSessionOrder: (accountKey: string, order: readonly string[]) => void
+  /** Workspaces this surface must not render, though their Sessions stay accounted. */
+  omittedWorkspaceIds: readonly WorkspaceId[]
   /** Registry-global pin and archive sets plus the archived-visibility choice. */
   rowState: SessionRowState
   /** Switch the archived filter back to the default hide-archived view. */
@@ -313,6 +341,7 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
 /** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
 function SessionTree({
   list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds,
+  omittedWorkspaceIds,
   rowState, onLeaveArchivedOnly,
   workspaceReady, animationResetKey, usePanelInfo, useRemoteAccess, useSessionAccess, useWorkspaceAccess,
   onSessionRenameRequest,
@@ -373,8 +402,9 @@ function SessionTree({
     () => deriveGroups(list, workspaces, rowState, statuses, {
       expandedGroups,
       ungroupedOrder: ungroupedSessionIds,
+      omitWorkspaceIds: omittedWorkspaceIds,
     }),
-    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds],
+    [list, workspaces, rowState, statuses, expandedGroups, omittedWorkspaceIds, ungroupedSessionIds],
   )
   useEffect(() => {
     for (let key = revealGroup; key !== undefined; key = parents.get(key)) {
@@ -679,7 +709,7 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
+  list, sessionIds, hiddenSessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, setSessionOrder, workspaceReady, animationResetKey,
   revealSessionId, onSessionRevealed, renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
 }: Pick<
@@ -702,20 +732,29 @@ function FlatList({
   | 't'
 > & {
   list: SessionListState
+  /** Complete flat order, including Sessions this surface omits. */
   sessionIds: readonly SessionId[]
+  /** Sessions of omitted Workspaces; the selected one stays, its siblings do not. */
+  hiddenSessionIds: ReadonlySet<SessionId>
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
+  const currentId = panelActive
+    ? undefined
+    : Object.values(list.byId).find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
+  // Deriving from the complete order keeps an omitted member in a saved drag
+  // order; only its row is withheld here.
+  const visibleIds = useMemo(
+    () => sessionIds.filter(id => !hiddenSessionIds.has(id) || id === currentId),
+    [currentId, hiddenSessionIds, sessionIds],
+  )
   const rows = useMemo(
-    () => deriveFlat(list, sessionIds, rowState, statuses),
-    [list, sessionIds, rowState, statuses],
+    () => deriveFlat(list, visibleIds, rowState, statuses),
+    [list, visibleIds, rowState, statuses],
   )
   const [drag, setDrag] = useState<DragState | null>(null)
   const dropCommitted = useRef(false)
   useNativeDragAcceptance(drag !== null)
-  const currentId = panelActive
-    ? undefined
-    : Object.values(list.byId).find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
   const commitDrag = (activeDrag: DragState, over: NonNullable<DragState['over']>): void => {
     if (dropCommitted.current) return
     dropCommitted.current = true
@@ -803,6 +842,7 @@ function SearchResults({
   workspaces,
   archivedSessionIds,
   archivedFilter,
+  hiddenWorkspaceSessionIds,
   query,
   remote,
   resultLimit,
@@ -814,6 +854,8 @@ function SearchResults({
   archivedSessionIds: readonly SessionNode['id'][]
   /** Search matches follow the archived filter selected for the list. */
   archivedFilter: ArchivedFilter
+  /** Sessions of omitted Workspaces; search never keeps the open-Session exception. */
+  hiddenWorkspaceSessionIds: ReadonlySet<SessionId>
   /** Unarchive an archived result row in place. */
   onUnarchive: (id: SessionNode['id']) => void
   query: string
@@ -833,11 +875,15 @@ function SearchResults({
       query,
       archivedSessionIds,
       archivedFilter,
+      hiddenWorkspaceSessionIds,
       statuses,
       currentRemote,
       resultLimit,
     ),
-    [list, workspaces, query, archivedSessionIds, archivedFilter, statuses, currentRemote, resultLimit],
+    [
+      list, workspaces, query, archivedSessionIds, archivedFilter, hiddenWorkspaceSessionIds,
+      statuses, currentRemote, resultLimit,
+    ],
   )
   const pending = currentRemote.status === 'loading'
   const currentId = panelActive
@@ -958,6 +1004,9 @@ export function WorkspaceBrowser({
   // Persisted view blobs written before the archived filter existed rehydrate
   // without the field; they read as the default hide-archived view.
   const archivedFilter = useStore(s => s.archivedFilter ?? 'default')
+  // The same holds for the hidden-Workspace reveal choice: an older blob has
+  // no field and reads as "hidden Workspaces are omitted".
+  const showHiddenWorkspaces = useStore(s => s.showHiddenWorkspaces ?? false)
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   // Archived sessions are not openable: the row stays visible under the
@@ -980,6 +1029,17 @@ export function WorkspaceBrowser({
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
     return list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))
   }, [list, workspaces])
+  // The open-Session exception follows the same definition the rows use: a
+  // global panel replaces the Conversation, so no Session counts as open then.
+  const panelActive = usePanelInfo(info => info.activePanelId !== null)
+  const openSessionId = panelActive ? undefined : mainSessionId
+  // Rendering consults the reveal choice; accounting above does not, so an
+  // omitted Workspace keeps its Sessions, their saved orders, and its
+  // expansion instead of releasing them to the ungrouped bucket.
+  const visibility = useMemo(
+    () => workspaceVisibility(workspaces, showHiddenWorkspaces, openSessionId),
+    [openSessionId, showHiddenWorkspaces, workspaces],
+  )
   const orderState = useMemo(
     () => ({ pinnedSessionIds, archivedSessionIds }),
     [archivedSessionIds, pinnedSessionIds],
@@ -1020,6 +1080,18 @@ export function WorkspaceBrowser({
       currentBlank !== undefined && flatMemberIds.includes(currentBlank) ? currentBlank : undefined,
     )
   }, [currentBlank, flatMemberIds, list.byId, orderBy, orderState, sessionOrderByAccount])
+  // The tree receives every Workspace so accounting and nesting stay intact,
+  // and omits the ones this surface must not render.
+  // The reveal control is relevant while it has something to reveal or is
+  // already revealing; only then does the action cluster hold three controls.
+  const revealAvailable = useMemo(
+    () => showHiddenWorkspaces || workspaces.some(workspace => workspace.hidden),
+    [showHiddenWorkspaces, workspaces],
+  )
+  const omittedWorkspaceIds = useMemo(() => {
+    const rendered = new Set(visibility.sidebar.map(workspace => workspace.workspaceId))
+    return workspaces.filter(workspace => !rendered.has(workspace.workspaceId)).map(workspace => workspace.workspaceId)
+  }, [visibility, workspaces])
   const activeSessionOrders = useMemo<Readonly<Record<string, readonly SessionId[]>>>(() => Object.fromEntries([
     ...orderedWorkspaces.map(workspace => [workspace.workspaceId, workspace.sessionIds] as const),
     [UNGROUPED_KEY, orderedUngroupedSessionIds] as const,
@@ -1284,7 +1356,20 @@ export function WorkspaceBrowser({
             </div>
           </div>
         )}
-        <div className={clsx(css.headerActions, wide && searchExpanded && css.headerActionsHidden)}>
+        <div className={clsx(
+          css.headerActions,
+          revealAvailable && css.headerActionsWithReveal,
+          wide && searchExpanded && css.headerActionsHidden,
+        )}>
+          {/* The reveal control appears only while it has something to do:
+              an installation that hides no Workspace keeps today's header. */}
+          {wide && revealAvailable && (
+            <HiddenWorkspacesControl
+              revealed={showHiddenWorkspaces}
+              onToggle={() => { actions.setShowHiddenWorkspaces(!showHiddenWorkspaces) }}
+              t={t}
+            />
+          )}
           {wide && (
             <ViewOptionsMenu
               groupBy={groupBy}
@@ -1325,6 +1410,7 @@ export function WorkspaceBrowser({
           createWorkspace={createWorkspace}
           useDirectoryFlow={useDirectoryFlow}
           renderDirectoryFlow={owner => renderSlot('sidebar.workspaces.directoryFlow', owner)}
+          showHiddenWorkspaces={showHiddenWorkspaces}
           addOnly
           onBusyChange={setDirectoryBusy}
           side="right"
@@ -1368,6 +1454,7 @@ export function WorkspaceBrowser({
               workspaces={workspaces}
               archivedSessionIds={archivedSessionIds}
               archivedFilter={archivedFilter}
+              hiddenWorkspaceSessionIds={visibility.hiddenSessionIds}
               query={normalizedQuery}
               remote={remoteSearch}
               resultLimit={searchResultLimit}
@@ -1381,10 +1468,11 @@ export function WorkspaceBrowser({
                 usePanelInfo={usePanelInfo}
                 list={list}
                 sessionIds={orderedFlatSessionIds}
+                hiddenSessionIds={visibility.hiddenSessionIds}
                 rowState={rowState}
                 onLeaveArchivedOnly={leaveArchivedOnly}
                 workspaceReady={workspaceReady}
-                animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
+                animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${showHiddenWorkspaces}`}
                 useSessionStatus={useSessionStatus}
                 open={guardedOpen}
                 onSessionRenameRequest={requestSessionRename}
@@ -1413,9 +1501,10 @@ export function WorkspaceBrowser({
                 useContextMenuTarget={useContextMenuTarget}
                 workspaces={orderedWorkspaces}
                 ungroupedSessionIds={orderedUngroupedSessionIds}
+                omittedWorkspaceIds={omittedWorkspaceIds}
                 workspaceReady={workspaceReady}
                 nestWorkspaces={groupBy === 'workspace-tree'}
-                animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
+                animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${showHiddenWorkspaces}`}
                 groupExpansion={groupExpansion}
                 setGroupExpanded={actions.setGroupExpanded}
                 setSessionOrder={saveSessionOrder}

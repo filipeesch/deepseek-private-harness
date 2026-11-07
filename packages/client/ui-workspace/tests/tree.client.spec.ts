@@ -12,7 +12,8 @@ import type { SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-con
 import {
   type ArchivedFilter,
   deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, visibleSessionIds, workspaceLabel, UNGROUPED_KEY,
+  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, visibleSessionIds, workspaceLabel, workspaceVisibility,
+  UNGROUPED_KEY,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
 
@@ -74,15 +75,18 @@ const branchedList = (
     },
   }
 }
-const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView => ({
+const workspace = (id: string, sessionIds: string[], title = id, hidden = false): WorkspaceView => ({
   workspaceId: wid(id), path: `/projects/${id}`, title,
   sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  hidden,
 })
 const view = (expandedGroups: readonly string[] = [], ungroupedOrder?: readonly string[]) => ({
   expandedGroups,
   ...(ungroupedOrder === undefined ? {} : { ungroupedOrder }),
 })
 const noArchive: readonly SessionId[] = []
+/** No case here hides a Workspace, so search omits no Session for that reason. */
+const noHidden = new Set<SessionId>()
 const noAttention: SessionStatusSnapshot = new Map()
 const status = (
   pendingInteraction: SessionPendingInteraction | undefined,
@@ -251,6 +255,41 @@ describe('Session ordering', () => {
   })
 })
 
+describe('workspaceVisibility', () => {
+  const hidden = workspace('hidden', ['inner', 'other'], 'Hidden', true)
+  const shown = workspace('shown', ['shown-session'], 'Shown')
+
+  it('omits a hidden Workspace from the rendered rows and from every choice', () => {
+    const visibility = workspaceVisibility([shown, hidden], false, undefined)
+    expect(visibility.sidebar.map(workspace => workspace.workspaceId)).toEqual(['shown'])
+    expect(visibility.choices.map(workspace => workspace.workspaceId)).toEqual(['shown'])
+    expect([...visibility.hiddenSessionIds]).toEqual(['inner', 'other'])
+  })
+
+  it('renders and offers a hidden Workspace once it is revealed', () => {
+    const visibility = workspaceVisibility([shown, hidden], true, undefined)
+    expect(visibility.sidebar.map(workspace => workspace.workspaceId)).toEqual(['shown', 'hidden'])
+    expect(visibility.choices.map(workspace => workspace.workspaceId)).toEqual(['shown', 'hidden'])
+    expect(visibility.hiddenSessionIds.size).toBe(0)
+  })
+
+  it('keeps the Workspace holding the selected Session rendered without offering it', () => {
+    const visibility = workspaceVisibility([shown, hidden], false, sid('other'))
+    expect(visibility.sidebar.map(workspace => workspace.workspaceId)).toEqual(['shown', 'hidden'])
+    // Selection is not a reveal: the choose flows still skip the Workspace.
+    expect(visibility.choices.map(workspace => workspace.workspaceId)).toEqual(['shown'])
+    // The strict set keeps the selected Session: callers decide where it shows.
+    expect(visibility.hiddenSessionIds).toEqual(new Set([sid('inner'), sid('other')]))
+  })
+
+  it('keeps caller order when the selected Session keeps an intermediate Workspace', () => {
+    const first = workspace('first', ['a'], 'First')
+    const last = workspace('last', ['z'], 'Last')
+    const visibility = workspaceVisibility([first, hidden, last], false, sid('inner'))
+    expect(visibility.sidebar.map(workspace => workspace.workspaceId)).toEqual(['first', 'hidden', 'last'])
+  })
+})
+
 describe('deriveGroups', () => {
   it('keeps caller-supplied Workspace and sessionIds order', () => {
     const sessions = list(summary('newer', 20), summary('older', 10))
@@ -352,6 +391,7 @@ describe('deriveGroups', () => {
       .find(node => node.id === done.id)!.completed).toBe(true)
     const search = deriveSearchResults(
       sessions, [workspace('first', ['done', 'plain'])], 'done', noArchive, 'default',
+      noHidden,
       statuses, { items: [], hasMore: false }, 10,
     )
     expect(search.items[0]?.completed).toBe(true)
@@ -398,6 +438,7 @@ describe('deriveGroups', () => {
     ])
     expect(deriveSearchResults(
       sessions, [workspace('first', ['parent', 'fork'])], 'parent', noArchive, 'default',
+      noHidden,
       noAttention, { items: [], hasMore: false }, 10,
     ).items[0]).toMatchObject({ id: parent.id, runningSubagentCount: 1 })
   })
@@ -421,7 +462,7 @@ describe('deriveGroups', () => {
     const counts = (snapshot: SessionStatusSnapshot) => [
       deriveGroups(sessions, [workspace('first', ['parent'])], noRows, snapshot, view(['first']))[0]!.sessions[0]!.runningSubagentCount,
       deriveFlat(sessions, [parent.id], noRows, snapshot)[0]!.runningSubagentCount,
-      deriveSearchResults(sessions, [], 'parent', noArchive, 'default', snapshot, { items: [], hasMore: false }, 10).items[0]!.runningSubagentCount,
+      deriveSearchResults(sessions, [], 'parent', noArchive, 'default', noHidden, snapshot, { items: [], hasMore: false }, 10).items[0]!.runningSubagentCount,
     ]
     expect(counts(statuses)).toEqual([1, 1, 1])
     statuses.set(child.id, status(undefined, { running: false }))
@@ -641,6 +682,7 @@ describe('deriveSearchResults archive filtering', () => {
       'needle',
       archived('gone'),
       'default',
+      noHidden,
       noAttention,
       { items: [{ sessionId: gone.id, snippet: 'needle body' }], hasMore: false },
       10,
@@ -652,7 +694,7 @@ describe('deriveSearchResults archive filtering', () => {
     const gone = summary('gone', 1)
     gone.title = gone.displayTitle = 'Needle archived'
     const result = deriveSearchResults(
-      list(gone), [], 'needle', archived('gone'), 'show', noAttention, { items: [], hasMore: false }, 10,
+      list(gone), [], 'needle', archived('gone'), 'show', noHidden, noAttention, { items: [], hasMore: false }, 10,
     )
     expect(result.items.map(item => [item.id, item.archived])).toEqual([[gone.id, true]])
   })
@@ -663,7 +705,7 @@ describe('deriveSearchResults archive filtering', () => {
     const gone = summary('gone', 1)
     gone.title = gone.displayTitle = 'Needle archived'
     const result = deriveSearchResults(
-      list(hit, gone), [], 'needle', archived('gone'), 'only', noAttention, { items: [], hasMore: false }, 10,
+      list(hit, gone), [], 'needle', archived('gone'), 'only', noHidden, noAttention, { items: [], hasMore: false }, 10,
     )
     expect(result.items.map(item => [item.id, item.archived])).toEqual([[gone.id, true]])
   })
@@ -681,6 +723,7 @@ describe('deriveSearchResults branch marks', () => {
       'needle',
       noArchive,
       'default',
+      noHidden,
       noAttention,
       { items: [], hasMore: false },
       10,
@@ -690,6 +733,26 @@ describe('deriveSearchResults branch marks', () => {
 })
 
 describe('deriveSearchResults', () => {
+  it('omits Sessions of hidden Workspaces even when one is selected, and matches them once revealed', () => {
+    const open = summary('open-hidden', 2)
+    open.title = open.displayTitle = 'Needle hidden'
+    const sessions = withMain(list(open), open.id)
+    const hiddenWorkspace = workspace('hidden', ['open-hidden'], 'Hidden', true)
+
+    // A Host content hit naming the hidden Session is excluded too, not just
+    // the local title match.
+    expect(deriveSearchResults(
+      sessions, [hiddenWorkspace], 'needle', noArchive, 'default', new Set([open.id]),
+      noAttention, { items: [{ sessionId: open.id, snippet: 'needle body' }], hasMore: false }, 10,
+    )).toEqual({ items: [], hasMore: false })
+
+    const revealed = deriveSearchResults(
+      sessions, [hiddenWorkspace], 'needle', noArchive, 'default', noHidden,
+      noAttention, { items: [], hasMore: false }, 10,
+    )
+    expect(revealed.items.map(item => item.id)).toEqual([open.id])
+  })
+
   it('merges local title/Workspace matches before ranked content hits and enriches duplicates', () => {
     const titleHit = summary('title-hit', 30, '/projects/a')
     titleHit.title = titleHit.displayTitle = 'Needle title'
@@ -707,6 +770,7 @@ describe('deriveSearchResults', () => {
       ' NEEDLE ',
       noArchive,
       'default',
+      noHidden,
       new Map([[titleHit.id, status({
         key: 'question:1', kind: 'plan-review', sessionId: titleHit.id,
       } as SessionPendingInteraction)]]),
@@ -765,7 +829,7 @@ describe('deriveSearchResults', () => {
     const other = summary('b7e0d4aa-session', 1)
     other.title = other.displayTitle = 'Another title'
     const result = deriveSearchResults(
-      list(idHit, other), [], '9A2C71', noArchive, 'default', noAttention, { items: [], hasMore: false }, 10,
+      list(idHit, other), [], '9A2C71', noArchive, 'default', noHidden, noAttention, { items: [], hasMore: false }, 10,
     )
     expect(result.items.map(item => [item.id, item.title])).toEqual([[idHit.id, 'Ordinary title']])
   })
@@ -782,6 +846,7 @@ describe('deriveSearchResults', () => {
       'new session',
       noArchive,
       'default',
+      noHidden,
       noAttention,
       {
         items: [
@@ -807,6 +872,7 @@ describe('deriveSearchResults', () => {
       'needle',
       noArchive,
       'default',
+      noHidden,
       noAttention,
       { items: [], hasMore: false },
       3,
@@ -820,13 +886,14 @@ describe('deriveSearchResults', () => {
       'needle',
       noArchive,
       'default',
+      noHidden,
       noAttention,
       { items: [{ sessionId: sid('body'), snippet: 'needle' }], hasMore: true },
       3,
     )
     expect(backendMore.items).toHaveLength(1)
     expect(backendMore.hasMore).toBe(true)
-    expect(deriveSearchResults(list(), [], '  ', noArchive, 'default', noAttention, { items: [], hasMore: true }, 3))
+    expect(deriveSearchResults(list(), [], '  ', noArchive, 'default', noHidden, noAttention, { items: [], hasMore: true }, 3))
       .toEqual({ items: [], hasMore: false })
   })
 })
@@ -846,6 +913,15 @@ describe('createWorkspaceViewStore', () => {
       groupExpansion: { alpha: true },
       sessionOrderByAccount: { alpha: ['one', 'two'] },
     })
+  })
+
+  it('defaults the hidden-Workspace reveal choice to hidden and records the switch', () => {
+    const store = createWorkspaceViewStore().create()
+    expect(store.getSnapshot().showHiddenWorkspaces).toBe(false)
+    store.actions.setShowHiddenWorkspaces(true)
+    expect(store.getSnapshot().showHiddenWorkspaces).toBe(true)
+    store.actions.setShowHiddenWorkspaces(false)
+    expect(store.getSnapshot().showHiddenWorkspaces).toBe(false)
   })
 
   it('retains positions when reselecting Manual and snapshots the supplied order on mode switches', () => {

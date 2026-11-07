@@ -19,7 +19,8 @@ const sessionId = z.string().transform(value => brandString<SessionId>(value))
 /**
  * Durable shape of one workspace record. `path` is the `fs.realpath` canon
  * stamped at create; `sessionIds` is the ordered ownership account (array
- * order is display order); timestamps are ISO-8601 strings.
+ * order is display order); timestamps are ISO-8601 strings. `hidden` defaults
+ * to false so records written before the field existed read as visible.
  */
 export const workspaceRecord = z.object({
   path: z.string(),
@@ -27,6 +28,7 @@ export const workspaceRecord = z.object({
   sessionIds: z.array(sessionId),
   createdAt: z.string(),
   updatedAt: z.string(),
+  hidden: z.boolean().default(false),
 })
 
 /** One stored workspace record, inferred from {@link workspaceRecord}. */

@@ -113,6 +113,11 @@ export interface TreeView {
   expandedGroups: readonly string[]
   /** Browser-local order for Sessions without a backing Workspace account. */
   ungroupedOrder?: readonly string[]
+  /**
+   * Workspaces this surface omits while keeping their Sessions accounted:
+   * a member of an omitted Workspace never becomes an ungrouped stray.
+   */
+  omitWorkspaceIds?: readonly string[]
 }
 
 interface Group {
@@ -219,6 +224,52 @@ export function pinCurrentBlank(
  * search) to archived rows.
  */
 export type ArchivedFilter = 'default' | 'show' | 'only'
+
+/** What one browsing surface renders once hidden Workspaces are accounted for. */
+export interface WorkspaceVisibility {
+  /**
+   * Sidebar rows in caller order: a hidden Workspace stays while it holds the
+   * selected Session, so the open conversation never loses its group.
+   */
+  readonly sidebar: readonly WorkspaceView[]
+  /**
+   * Workspaces the choose flows and the new-Session fallback consider: a hidden
+   * one is omitted while hidden Workspaces are not revealed.
+   */
+  readonly choices: readonly WorkspaceView[]
+  /** Sessions accounted to an omitted Workspace; callers keep the selected one where the surface shows it. */
+  readonly hiddenSessionIds: ReadonlySet<SessionId>
+}
+
+/**
+ * Split the Workspace list by the reveal choice. A Session never moves: the
+ * accounting of an omitted Workspace stays intact, so revealing that
+ * Workspace later restores its saved order.
+ * @param workspaces - complete Workspace projection in registry order.
+ * @param showHidden - whether hidden Workspaces are revealed in this browser.
+ * @param selectedSessionId - Session open in the main view, if any.
+ * @returns the rows each surface renders and the Sessions of omitted Workspaces.
+ */
+export function workspaceVisibility(
+  workspaces: readonly WorkspaceView[],
+  showHidden: boolean,
+  selectedSessionId: SessionId | undefined,
+): WorkspaceVisibility {
+  const omitted = (workspace: WorkspaceView): boolean => workspace.hidden && !showHidden
+  const selected = selectedSessionId === undefined
+    ? undefined
+    : workspaces.find(workspace => omitted(workspace) && workspace.sessionIds.includes(selectedSessionId))
+  const hiddenSessionIds = new Set<SessionId>()
+  for (const workspace of workspaces) {
+    if (!omitted(workspace)) continue
+    for (const sessionId of workspace.sessionIds) hiddenSessionIds.add(sessionId)
+  }
+  return {
+    sidebar: workspaces.filter(workspace => !omitted(workspace) || workspace === selected),
+    choices: workspaces.filter(workspace => !omitted(workspace)),
+    hiddenSessionIds,
+  }
+}
 
 /**
  * Ordinary sessions are visible; among blank sessions, only the current one
@@ -328,6 +379,7 @@ function groupByWorkspace(
   archived: ReadonlySet<SessionId>,
   archivedFilter: ArchivedFilter,
   ungroupedOrder: readonly string[] | undefined,
+  omitted: ReadonlySet<string>,
 ): Group[] {
   const current = mainSessionId(list)
   const groups: Group[] = []
@@ -341,6 +393,9 @@ function groupByWorkspace(
       if (!sessionVisible(summary, current, archived, archivedFilter)) continue
       members.push(summary)
     }
+    // An omitted Workspace still accounts for its Sessions: they must not
+    // reappear as ungrouped strays.
+    if (omitted.has(workspace.workspaceId)) continue
     // The archived-only view lists archives, not the Workspace inventory, so
     // a Workspace without archived Sessions contributes no group.
     if (archivedFilter === 'only' && members.length === 0) continue
@@ -440,7 +495,10 @@ export function deriveGroups(
     ? undefined
     : owningGroupKey(workspaces, current)
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
+  const omitted = new Set<string>(view.omitWorkspaceIds ?? [])
+  for (const g of groupByWorkspace(
+    list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder, omitted,
+  )) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -526,6 +584,7 @@ export function deriveFlat(
  * @param query - caller text; surrounding whitespace is ignored.
  * @param archivedSessionIds - registry-global archive set (members match per the archived filter).
  * @param archivedFilter - archived-row visibility choice; search follows it.
+ * @param hiddenWorkspaceSessionIds - Sessions of omitted Workspaces; search has no open-Session exception.
  * @param statuses - unified UI status by Session.
  * @param content - ranked Host content-search page.
  * @param limit - protocol-owned maximum merged row count.
@@ -537,6 +596,7 @@ export function deriveSearchResults(
   query: string,
   archivedSessionIds: readonly SessionId[],
   archivedFilter: ArchivedFilter,
+  hiddenWorkspaceSessionIds: ReadonlySet<SessionId>,
   statuses: SessionStatuses,
   content: { items: readonly SessionSearchResultItem[]; hasMore: boolean },
   limit: number,
@@ -564,7 +624,8 @@ export function deriveSearchResults(
     const summary = list.byId[id]
     // Blank placeholders never match a query (their canonical title displays
     // localized, so matching it would tie search to one language).
-    if (summary === undefined || summary.blank || !sessionVisible(summary, current, archived, archivedFilter)) continue
+    if (summary === undefined || summary.blank || hiddenWorkspaceSessionIds.has(summary.id)
+      || !sessionVisible(summary, current, archived, archivedFilter)) continue
     if (
       sessionTitle(summary).toLowerCase().includes(q)
       || labelOf(summary).toLowerCase().includes(q)
@@ -587,7 +648,8 @@ export function deriveSearchResults(
   for (const summary of orderedLocal) include(summary)
   for (const item of content.items) {
     const summary = list.byId[item.sessionId]
-    if (summary !== undefined && !summary.blank && sessionVisible(summary, current, archived, archivedFilter)) include(summary)
+    if (summary !== undefined && !summary.blank && !hiddenWorkspaceSessionIds.has(summary.id)
+      && sessionVisible(summary, current, archived, archivedFilter)) include(summary)
   }
 
   return {
