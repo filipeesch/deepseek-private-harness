@@ -578,15 +578,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // Without HMR the profile applies configuration changes at its next start.
     ...options.profile?.hmr === false ? [{ id: 'hmr', disabled: true }] : [],
     { id: 'ui-plugin-manager', config: { registryProbeEnabled: false } },
-    // The shipped base carries no default model; the scaffold names the DeepSeek route its goldens expect.
-    {
-      id: 'agent-default-model',
-      config: mode === 'record' || options.deepSeekMissingCredential === true
-        ? { provider: 'deepseek-official', model: 'deepseek-flash' }
-        : { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-    },
-    // Likewise the shipped base selects no search provider; the goldens expect the DeepSeek Search API.
-    { id: 'web', config: { searchProvider: 'deepseek-search-api', fetchProvider: 'http' } },
+    ...mode === 'record' || options.deepSeekMissingCredential === true
+      ? []
+      : [{ id: 'agent-default-model', config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }],
     ...extraOverlayPatches,
     { id: 'agent-preset-registry', config: { default: 'standard' } },
     { id: 'session-persistence-jsonl', config: { root: persistenceRoot } },

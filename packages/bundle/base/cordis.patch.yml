@@ -80,12 +80,12 @@
       name: '@deepseek-ai/dsh-agent'
 
     # The transport-independent default for Agents created by entry points.
-    # No model is the default: the row carries no provider or model until the
-    # user picks one (the first model picked in the Web or Desktop picker is
-    # saved here) or a profile patch sets them. Until then a new Session has no
-    # model and its first request fails with an error that asks for a selection.
+    # Settings may supply a saved selection; consumers read it at creation time.
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
+      config:
+        provider: deepseek-official
+        model: deepseek-flash
 
     - id: jobs
       name: '@deepseek-ai/dsh-jobs-local'
@@ -437,6 +437,7 @@
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
+        searchProvider: deepseek-search-api
         fetchProvider: http
 
     - id: web-search-deepseek

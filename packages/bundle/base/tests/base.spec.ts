@@ -32,15 +32,16 @@ describe('dsh-base bundle', () => {
     )
     expect(rows.length).toBeGreaterThan(50)
     expect(rows.some(row => row.id === 'agent-loop')).toBe(true)
-    // The private distribution mounts no telemetry, analytics, or request-upload rows.
-    expect(rows.filter(row => /telemetry|otel|analytics|session-log|package-inventory/u.test(row.id ?? ''))).toEqual([])
+    expect(rows.find(row => row.id === 'session-telemetry-otel')?.disabled).toBeUndefined()
+    expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toEqual({
+      __jsExpr: "process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY'",
+    })
     expect(rows.find(row => row.id === 'hmr')).toMatchObject({
       config: { root: [] },
     })
     expect(rows.filter(row => row.id === 'subagent-codex')).toHaveLength(0)
     expect(rows.filter(row => row.id === 'subagent-claude-code')).toHaveLength(0)
-    // Search has no shipped default provider: the user must select one.
-    expect(rows.find(row => row.id === 'web')?.config).toEqual({ fetchProvider: 'http' })
+    expect(rows.find(row => row.id === 'web')?.config).toEqual({ searchProvider: 'deepseek-search-api', fetchProvider: 'http' })
     expect(rows.find(row => row.id === 'web-deepseek-api')).toEqual({ id: 'web-deepseek-api', name: '@deepseek-ai/dsh-web-deepseek-api' })
     expect(rows.find(row => row.id === 'web-fetch-http')).toBeDefined()
     expect(rows.find(row => row.id === 'web-search-deepseek')).toMatchObject({

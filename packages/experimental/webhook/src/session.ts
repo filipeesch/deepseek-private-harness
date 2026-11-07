@@ -55,11 +55,7 @@ function resolveRequest(ctx: Context, input: WebhookSessionRequest): ResolvedWeb
   }
   let agentOptions: AgentOptions
   if (model === undefined) {
-    const selection = ctx.agentDefaultModel.currentSelection()
-    if (selection === undefined) {
-      throw new TypeError('webhook Session request names no model and no default model is configured')
-    }
-    agentOptions = { ...selection }
+    agentOptions = { ...ctx.agentDefaultModel.currentSelection() }
   } else {
     const modelRecord = model as Record<string, unknown>
     const provider = requiredString(modelRecord, 'provider')

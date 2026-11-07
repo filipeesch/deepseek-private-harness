@@ -119,10 +119,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Owns the default model selection independently of any Host or transport. Each operation reads the owning Config references.',
     methods: [
       {
-        signature: 'currentSelection(): ModelSelection | undefined',
+        signature: 'currentSelection(): ModelSelection',
         description: 'Read the current default model selection.',
         parameters: [],
-        returns: 'a detached provider, model, and optional reasoning selection, or `undefined` while no default is configured.',
+        returns: 'a detached provider, model, and optional reasoning selection.',
       },
       {
         signature: 'async saveSelection(next: ModelSelection): Promise<void>',

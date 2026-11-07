@@ -129,9 +129,9 @@ async function harness(logged?: {
   }
   const projection = await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
   const options = {
-    get provider() { return ctx.agentDefaultModel.currentSelection()!.provider },
-    get model() { return ctx.agentDefaultModel.currentSelection()!.model },
-    get reasoningEffort() { return ctx.agentDefaultModel.currentSelection()!.reasoningEffort },
+    get provider() { return ctx.agentDefaultModel.currentSelection().provider },
+    get model() { return ctx.agentDefaultModel.currentSelection().model },
+    get reasoningEffort() { return ctx.agentDefaultModel.currentSelection().reasoningEffort },
   }
   const agent = {
     id: session.id,
@@ -170,10 +170,8 @@ function registerTextOnly(ctx: Context): void {
 function currentSelection(ctx: Context, sessionId: SessionId) {
   const session = ctx.sessions.get(sessionId)
   if (session === undefined) throw new Error('expected a live test Session')
-  const selection = ctx.sessionProjections.snapshot(session).values.modelSelection?.next
+  return ctx.sessionProjections.snapshot(session).values.modelSelection?.next
     ?? ctx.agentDefaultModel.currentSelection()
-  if (selection === undefined) throw new Error('expected a selected model')
-  return selection
 }
 
 describe('Web session model selection', () => {
