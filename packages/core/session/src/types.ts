@@ -433,6 +433,19 @@ export interface SessionEventMap {
    * so tolerating concurrent writers needs a signal beyond the log.
    */
   'session/end-seed': { inherited?: true }
+  /**
+   * Records that a configured endpoint accepted one Session-log delivery
+   * through `throughSeq`. No plugin in this private distribution appends it;
+   * the declaration stays so Sessions written by upstream builds keep loading.
+   */
+  'session-log-deepseek/delivery-accepted': {
+    /** Session identity the accepted delivery carried; inherited fork markers retain the parent's id. */
+    sessionId: SessionId
+    /** Accepted Session format generation; absence identifies version 0. */
+    sessionFormatVersion?: number
+    /** Last canonical event included in the accepted request. */
+    throughSeq: SessionSeq
+  }
 }
 
 /** The appendable event-type keys of {@link SessionEventMap}, plugin-merged extensions included. */

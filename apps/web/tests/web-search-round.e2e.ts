@@ -93,7 +93,7 @@ interface CapturedSearchRequest {
   body: unknown
 }
 
-/** The Search API `query` field of one captured request body; `ori_question` also names every query. */
+/** The Search API `query` field of one captured request body. */
 function requestQuery(body: unknown): unknown {
   return typeof body === 'object' && body !== null && 'query' in body ? body.query : undefined
 }
@@ -208,9 +208,7 @@ describe('web e2e: default Search API web search', () => {
       const request = searchRequests.find(candidate => requestQuery(candidate.body) === query)
       if (request === undefined) throw new Error(`missing provider request for query: ${query}`)
       expect(request).toMatchObject({ path: '/api/v1/tools/search', apiKey: `Bearer ${SEARCH_CREDENTIAL}` })
-      expect(request.body).toEqual({
-        query, count: WEB_SEARCH_MAX_RESULTS, need_content: false, ori_question: Array.from(PROMPT).slice(0, 128).join(''),
-      })
+      expect(request.body).toEqual({ query, count: WEB_SEARCH_MAX_RESULTS, need_content: false })
     }
     expect(sessionEvents.filter(event => event.type === 'web/deepseek-search-llm-request')).toEqual([])
 

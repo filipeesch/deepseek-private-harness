@@ -190,10 +190,12 @@ describe('PiAiAdapter provider routing', () => {
     })
     expect(server.requests[0]).not.toHaveProperty('dsh_session_log')
     expect(server.requests[0]).not.toHaveProperty('dsh_plugin_packages')
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+    expect(JSON.stringify([server.requests[0], server.headers[0]])).not.toContain('session-for-pi')
   })
 
-  it('routes OpenCode Go requests by Session id through its required session header', async () => {
-    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+  it('sends no Session id to OpenCode Go, which would otherwise receive it as a session header', async () => {
+    const server = await mockServer([{ events: textEvents }])
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     ctx.llm.registerAdapter(['opencode-go'], adapterOf({
@@ -206,11 +208,10 @@ describe('PiAiAdapter provider routing', () => {
       messages: [],
       sessionId: 'opencode-session' as never,
     })
-    await assemble(ctx, { provider: 'opencode-go', model: 'deepseek-v4.1-flash', messages: [] })
 
-    expect(server.paths).toEqual(['/v1/chat/completions', '/v1/chat/completions'])
-    expect(server.headers[0]?.['x-opencode-session']).toBe('opencode-session')
-    expect(server.headers[1]).not.toHaveProperty('x-opencode-session')
+    expect(server.paths).toEqual(['/v1/chat/completions'])
+    expect(server.headers[0]).not.toHaveProperty('x-opencode-session')
+    expect(JSON.stringify([server.requests[0], server.headers[0]])).not.toContain('opencode-session')
   })
 
   it('uses a dynamic request effort and reports unsupported efforts before network I/O', async () => {

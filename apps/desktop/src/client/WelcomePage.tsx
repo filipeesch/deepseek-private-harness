@@ -28,7 +28,6 @@ export function Welcome({ api }: { api: WelcomeApi }) {
   async function saveKey(event: FormEvent) {
     event.preventDefault()
     if (busyRef.current) return
-    void api.analytics?.('api_key_save_click', {})
     const value = draft.trim()
     if (!/^[\x21-\x7e]+$/.test(value) || /^[A-Z][A-Z0-9_]*=[^=]/.test(value)
       || ((value.startsWith('"') || value.startsWith("'") || value.charCodeAt(0) === 96) && value.at(-1) === value[0])) {

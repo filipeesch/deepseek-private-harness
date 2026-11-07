@@ -453,11 +453,15 @@ export class ApiSessionAgentController {
   private agentOptions(): AgentOptions {
     const defaults = this.ctx.agentDefaultModel
     // A Session that records no selection or request follows default changes.
-    return {
-      get provider() { return defaults.currentSelection().provider },
-      get model() { return defaults.currentSelection().model },
-      get reasoningEffort() { return defaults.currentSelection().reasoningEffort },
-    }
+    // While no default is configured each accessor reads `undefined`, exactly as
+    // an absent optional property would; an accessor keeps that read live.
+    const options: AgentOptions = {}
+    Object.defineProperties(options, {
+      provider: { enumerable: true, get: () => defaults.currentSelection()?.provider },
+      model: { enumerable: true, get: () => defaults.currentSelection()?.model },
+      reasoningEffort: { enumerable: true, get: () => defaults.currentSelection()?.reasoningEffort },
+    })
+    return options
   }
 
   /**

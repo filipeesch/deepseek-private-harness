@@ -41,7 +41,6 @@ kind: "package-reference"
 |---|---|---|
 | `count` | `10` | Search API 每次搜索的结果数，为 1 至 50 的整数；请求中更小的 `maxResults` 优先 |
 | `searchRequestsPerSecond` | `5` | 本插件实例在任意一秒窗口内最多发送的 Search 请求数，与服务的账号级 5 QPS 限制一致；后续搜索排队等待，等待时间计入调用方的超时 |
-| `sendOriginalQuestion` | `true` | 将触发搜索的用户提示截取至 128 个字符，作为 Search API 的 `ori_question` 发送 |
 | `searchBaseURL` | 省略 | Search API 基础地址，包含路径前缀；追加 `/search`。只设置此项时，`searchApiKeyEnv` 默认为 `DEEPSEEK_API_KEY`（[鉴权](#authentication)） |
 | `searchApiKeyEnv` | 省略 | Search 凭据引用。只设置此项时，`searchBaseURL` 默认为 `https://api.deepseek.com/v1/tools` |
 | `fetchBaseURL` | 省略 | Fetch API 基础地址，包含路径前缀；追加 `/fetch`，默认值规则相同 |
@@ -65,7 +64,7 @@ Search 与 Fetch 每次操作各自从同一份设置快照解析端点和凭据
 
 ### 结果与失败
 
-Search API 接收 `query`、`count`（配置的结果数，或请求中更小的 `maxResults`）、`need_content: false`，以及在 `sendOriginalQuestion` 未关闭时的 `ori_question`：发起会话中最近一条用户提示的文本，空白折叠后截取至 128 个字符。在会话之外或没有此类提示的搜索不发送该字段。提供者将 `results[].snippet` 映射为展示用摘录，将 `results[].summary` 映射为面向模型的摘录，并将可为 null 的 `date` 映射为可选的 `publishedAt`；`dsh-tool-web` 限制每条摘要的长度。空结果数组表示成功。Fetch 发送 `url`，以文本正文返回原始 Markdown，并报告 HTTP 状态 200，因为目标没有可用内容时 API 会返回错误状态。返回 URL 为请求 URL：API 不报告重定向后的最终 URL。
+Search API 接收 `query`、`count`（配置的结果数，或请求中更小的 `maxResults`）、`need_content: false`，不发送其他字段：用户提示从不随搜索发送。提供者将 `results[].snippet` 映射为展示用摘录，将 `results[].summary` 映射为面向模型的摘录，并将可为 null 的 `date` 映射为可选的 `publishedAt`；`dsh-tool-web` 限制每条摘要的长度。空结果数组表示成功。Fetch 发送 `url`，以文本正文返回原始 Markdown，并报告 HTTP 状态 200，因为目标没有可用内容时 API 会返回错误状态。返回 URL 为请求 URL：API 不报告重定向后的最终 URL。
 
 单独配置的基础地址无法解析时，该能力的提供者不可用；`count` 不在 1 至 50 之间时，Search 不可用。凭据缺失以 `WEB_PROVIDER_CREDENTIAL_MISSING` 失败；所需模型路由的设置无法解析时以 `WEB_PROVIDER_MISCONFIGURED` 失败，并点名解析器的失败原因、模型页面以及该能力的 `*BaseURL` 与 `*ApiKeyEnv`；取消使用 `WEB_ABORTED`；传输、HTTP 和响应格式错误使用 `WEB_PROVIDER_ERROR`。重定向在联系目标前即被拒绝。Fetch API 的非成功状态表示抓取失败，不代表目标页面的状态。请求失败指出端点及其来源：路由端点指导用户在模型页面检查该提供方的基础地址，或设置该能力的 `*BaseURL` 与 `*ApiKeyEnv`；单独配置指导用户修改或删除这两个字段。不会自动重试或回退至其他提供者。
 
@@ -121,7 +120,6 @@ Search API 接收 `query`、`count`（配置的结果数，或请求中更小的
 <a id="known-limitations-and-deferred-work"></a>
 
 - 共享搜索请求不暴露 `localization`；提供者不请求搜索全文，也不消费 `site_name`、`site_icon`、`rerank_score` 或 `authority`。2026-10-16 实测返回的 `summary` 长度为 1,000–2,300 个字符，超过消费方的默认上限。
-- 2026-10-16 的探测中，不同的 `ori_question` 未改变结果顺序、评分或摘要；由于指南将其列为意图信号，提供者仍会发送。
 - 查询和 URL 约束由远端服务执行。2026-10-16 抓取无法解析的目标域名时返回 HTTP 500，而非文档所述的 404，其失败信息与端点失败附带相同的端点指引。Fetch 既不暴露目标状态，也不暴露最终重定向 URL，因此结果报告 HTTP 200 和请求 URL；提供者丢弃 API 返回的页面标题。
 - `available()` 无法查询异步凭据存储；`ready()` 可以，因此凭据存储缺少密钥时，模型步骤会撤下这两个工具。直接调用 `ctx.web.search()` 或 `ctx.web.fetch()` 仍可能因凭据缺失失败。
 - Search 限速只约束单个插件实例内的发送时间。同一账号下的其他进程和客户端共享账号级 5 QPS 限制，彼此不协调，网络抖动也可能使请求集中到达；HTTP 429 会使该次搜索失败，随后 `dsh-tool-web` 会使整个多查询调用失败。Fetch 不限速，因此并行的 `web_fetch` 调用可能超过 Fetch 限制。

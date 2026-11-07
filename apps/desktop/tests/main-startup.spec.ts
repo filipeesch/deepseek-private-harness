@@ -187,8 +187,6 @@ const harness = await vi.hoisted(async () => {
       }
     }),
   })
-  let analyticsEnabled = true
-  const analytics = vi.fn(async (_event: unknown) => {})
   const nativeTheme = { themeSource: 'system', shouldUseDarkColors: false }
   const trays: FakeTray[] = []
   class FakeTray extends EventEmitter {
@@ -201,13 +199,10 @@ const harness = await vi.hoisted(async () => {
   const shellDialog = { isOpen: false, focus: vi.fn() }
   return {
     failWindow(error: Error) { windowFailure = error },
-    windows, views, hosts, handlers, app, FakeWindow, FakeView, FakeHost, powerMonitor, nativeTheme, analytics,
+    windows, views, hosts, handlers, app, FakeWindow, FakeView, FakeHost, powerMonitor, nativeTheme,
     trays, FakeTray, backgroundNotice, shellDialog,
     menu, popup, socketHeaders: vi.fn(), connectWelcome: vi.fn(), removeLegacyHostCookies: vi.fn(async () => {}), hostCookies: {},
     loginShell, readLoginShell, updateCheck, updateDownload, updateInstall,
-
-    get analyticsEnabled() { return analyticsEnabled },
-    set analyticsEnabled(value: boolean) { analyticsEnabled = value },
     ipcOn: vi.fn<(channel: string, listener: (event: { sender: unknown; senderFrame: unknown }, ...args: unknown[]) => void) => void>(),
     get updateState() { return updateState },
     set updateState(value: DesktopUpdateState) { updateState = value },
@@ -358,8 +353,6 @@ vi.mock('../src/welcome-backend.ts', () => ({
   connectDesktopWelcome: (...args: unknown[]) => {
     harness.connectWelcome(...args)
     return {
-      analyticsEnabled: async () => harness.analyticsEnabled,
-      report: harness.analytics,
       readLocalePreference: async () => null,
       read: async (): Promise<unknown> => (await harness.hosts.at(-1)!.fetch()).json() as Promise<unknown>,
       save: async () => ({ ok: true }),
@@ -417,7 +410,6 @@ beforeEach(() => {
   vi.stubEnv('DSH_DESKTOP_DEV_PROJECT_DIR', undefined)
   vi.stubEnv('DSH_DESKTOP_UPDATE_JOURNAL_DIR', undefined)
   vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3')
-  harness.analyticsEnabled = true
 })
 
 afterEach(async () => {
@@ -1714,23 +1706,6 @@ describe('desktop main startup', () => {
     expect(window.listenerCount('leave-full-screen')).toBe(baseline.leave)
   })
 
-  it.each(['accepted', 'failed'] as const)('settles analytics intake before locking API admission and continues after intake failure: %s', async (outcome) => {
-    const host = await readyForUpdate()
-    await vi.waitFor(() => { expect(harness.analytics).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'desktop_app_launch' })) })
-    const intake = Promise.withResolvers<undefined>()
-    harness.analytics.mockImplementationOnce(() => intake.promise)
-    harness.dialog.showMessageBox.mockResolvedValueOnce({ response: 0 })
-    const preparing = harness.prepareUpdate()
-    await vi.waitFor(() => { expect(harness.analytics).toHaveBeenLastCalledWith(expect.objectContaining({ eventName: 'desktop_upgrade_install_restart_click' })) })
-    expect(host.updateTasks.mock.calls).toEqual([['inspect']])
-    expect(host.stop).not.toHaveBeenCalled()
-    if (outcome === 'accepted') intake.resolve(undefined)
-    else intake.reject(new Error('local analytics intake timed out'))
-    await host.stopping.promise
-    host.exited.resolve()
-    await expect(preparing).resolves.toBe(true)
-  })
-
   it.each(['inspection', 'dialog'] as const)('closes the main window and cancels the pending quit %s when the installer quits Electron', async (pendingPhase) => {
     const host = await readyWorkspace()
     const inspected = Promise.withResolvers<{ activeTasks: boolean; scheduledTasks: boolean }>()
@@ -2172,7 +2147,6 @@ describe('desktop main startup', () => {
     expect(harness.hosts[0]!.environment?.DSH_CLIENT_VERSION).toBe('1.2.3')
     expect(harness.hosts[0]!.environment?.DSH_TEST_LOGIN_SHELL).toBe('login')
     expect(console.warn).toHaveBeenCalledWith('desktop login shell: /account/shell failed (timeout)')
-    expect(harness.analytics).toHaveBeenCalledExactlyOnceWith({ eventName: 'desktop_app_launch', timestamp: Date.now(), attributes: {} })
     expect(harness.hosts[0]!.start).toHaveBeenCalledTimes(1)
     expect(harness.windows).toHaveLength(1)
     expect(window.urls).toEqual(['dsh-app://app/'])
@@ -2260,16 +2234,4 @@ describe('desktop main startup', () => {
     expect(window.urls).toEqual(['dsh-app://app/'])
     expect(harness.windows).toHaveLength(1)
   })
-})
-
-it('disables native product events for a disabled Desktop launch', async () => {
-  harness.analyticsEnabled = false
-  await import('../src/main.ts')
-  await harness.preparing.promise
-  harness.prepared.resolve()
-  await harness.hostStarted.promise
-  harness.hosts[0]!.ready.resolve()
-  await harness.navigated.promise
-  expect(harness.analytics).not.toHaveBeenCalled()
-  harness.analyticsEnabled = true
 })

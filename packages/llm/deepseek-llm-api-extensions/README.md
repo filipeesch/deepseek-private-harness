@@ -31,7 +31,7 @@ Each provider sees the exact serialized Messages body, the request `AbortSignal`
 
 Request `purpose` is the producer-defined string forwarded by the adapter, or absent for ordinary conversation requests. The registry forwards unfamiliar purposes without choosing field-specific policy.
 
-The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh-session-log-deepseek` owns `dsh_session_log`; `@deepseek-ai/dsh-plugin-package-inventory-deepseek` owns `dsh_plugin_packages`. The provider-neutral LLM seam and `llm-pi-ai` do not consume this registry.
+The registry owns addition and lifecycle, not field semantics. The private distribution ships no field provider; a contributor that a composition mounts owns its field, and each such contributor is a new outbound path. The provider-neutral LLM seam and `llm-pi-ai` do not consume this registry.
 
 <a id="model-experience"></a>
 ## Model Experience

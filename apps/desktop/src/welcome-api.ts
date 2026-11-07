@@ -1,28 +1,18 @@
 /** Operations available to the isolated native welcome renderer. */
 
-import type { ProductEventMap } from '@deepseek-ai/dsh-client-product-analytics/types'
 import type { DesktopLocale } from './locale.ts'
 
 /** Private native welcome channels, installed only while its window exists. */
 export const WELCOME_IPC = {
   saveApiKey: 'dsh-welcome:save-api-key',
-  analytics: 'dsh-welcome:analytics',
-  analyticsEnabled: 'dsh-welcome:analytics-enabled',
   skip: 'dsh-welcome:skip',
 } as const
 
 /** Credential writes return a safe outcome without exposing Host diagnostics. */
 export type WelcomeSaveResult = { readonly ok: true } | { readonly ok: false }
 
-type WelcomeEventName = 'auth_page_view' | 'api_key_save_click'
-
 /** Host-owned operations used by the welcome window. */
 export interface WelcomeOperations {
-  /** @param eventName - allowed welcome event. @param attributes - approved fields without credentials. */
-  analytics?<K extends WelcomeEventName>(eventName: K, attributes: ProductEventMap[K]): Promise<void>
-  /** @returns the Host's current effective collection policy. */
-  analyticsEnabled(): Promise<boolean>
-
   /**
    * Store the official provider's key before entering the workspace.
    * @param value - validated, trimmed API key.

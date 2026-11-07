@@ -13,8 +13,6 @@ afterEach(cleanup)
 function mount(language = 'zh-CN') {
   cleanup()
   const api = {
-    analytics: vi.fn(async (_event: string, _attributes: object) => {}),
-    analyticsEnabled: async () => true,
     ...resolveDesktopLocale(language),
     saveApiKey: vi.fn<(value: string) => Promise<WelcomeSaveResult>>().mockResolvedValue({ ok: true }),
     skip: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),

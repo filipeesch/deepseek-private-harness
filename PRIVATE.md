@@ -6,15 +6,16 @@
 
 Keep these removed. Upstream changes to them are dropped during merges.
 
-- Session-log upload (`session-log-deepseek`) and plugin inventory (`plugin-package-inventory-deepseek`) request extensions.
-- Identity headers `x-deepseek-harness-*` and the `anonymous-user-id` package.
-- Session telemetry (`session-telemetry-otel`, `session-telemetry`, `otel`) and Desktop product analytics (`product-telemetry-otel`, `product-analytics`, Desktop `track()` calls).
-- Web-search `ori_question` (prompt excerpt sent with searches).
+- Session-log upload (`session-log-deepseek`, `ui-settings-session-log`) and plugin inventory (`plugin-package-inventory-deepseek`) request extensions. The `deepseek-llm-api-extensions` registry stays as an inert seam with no shipped contributor (the SDK request-observation fixture and the LLM replay harness still use it); any new contributor is a new outbound path and is removed in the merge.
+- Identity headers `x-deepseek-harness-*`, the `anonymous-user-id` package (and its `$DSH_HOME/.anonymous-user-id` file), and the Session id that `llm-pi-ai` forwarded to pi-ai (provider session-affinity headers and `prompt_cache_key`).
+- Session telemetry (`session-telemetry-otel`, `session-telemetry`, `otel`), Desktop product analytics (`product-telemetry-otel`, `product-analytics`, Desktop `track()` calls, the `productAnalytics` Remote), and the `DSH_TELEMETRY_*` / `DSH_PRODUCT_ANALYTICS_OTLP_URL` environment variables with the `ProfileContext.telemetryDisabledEnv` plumbing.
+- Web-search `ori_question` and its `sendOriginalQuestion` setting (prompt excerpt sent with searches).
+- Electron spellchecking (`spellcheck: false` on the Desktop windows), which downloads dictionaries.
 - DeepSeek account Sign In: `deepseek-account`, `deepseek-account-platform`, `llm-deepseek-account`, `account-controller`, `ui-settings-account`, Desktop Welcome sign-in and Platform view, the Feishu contact form.
 - Desktop mandatory-update policy and the `download.deepseek.com` update feed.
 - Upstream CI and governance in `.github`: every upstream workflow except `private-desktop-release.yml`, the review-ownership and issue-management policies, `dependabot.yml`, issue templates, and the specs and gates that only policed them. Upstream CI needs DeepSeek runners, secrets, and GitHub App credentials; Dependabot PRs would fight upstream syncs; Issues are disabled.
 
-DeepSeek remains an API-key model provider, never the default model or default search provider. Feedback stays local. Desktop updates come only from this repository's GitHub Releases (Windows x64 today; Linux once Desktop packaging supports it; no macOS builds) through the `private-desktop-release.yml` workflow; a push to `master` that carries a Desktop version without a `v<version>` tag publishes that version.
+DeepSeek remains an API-key model provider, never the default model or default search provider: the base `agent-default-model` row has no provider or model (the first model the user picks is saved there; headless and webhook entry points fail with a message until one is configured), and `web.searchProvider` is unset (a search fails with a structured error until the user selects a provider). Feedback stays local. Desktop updates come only from this repository's GitHub Releases (Windows x64 today; Linux once Desktop packaging supports it; no macOS builds) through the `private-desktop-release.yml` workflow; a push to `master` that carries a Desktop version without a `v<version>` tag publishes that version.
 
 ## CI
 
@@ -51,5 +52,5 @@ Investigate new hits after every merge:
 
 ```sh
 grep -rhoE 'https?://[a-zA-Z0-9.-]+\.[a-z]{2,}' packages apps native --include='*.ts' --include='*.tsx' --include='*.yml' --exclude-dir=node_modules --exclude-dir=lib --exclude-dir=tests | sort -u
-grep -rnE 'productTelemetry|productAnalytics|sessionTelemetry|createEventReporter|deepseekLlmApiExtensions|anonymous-user-id|x-deepseek-harness|deepseekAccount|deepseeksvc' packages apps --include='*.ts' --include='*.tsx' --include='*.yml' --exclude-dir=node_modules --exclude-dir=lib
+grep -rnE 'productTelemetry|productAnalytics|sessionTelemetry|createEventReporter|deepseekLlmApiExtensions|anonymous-user-id|x-deepseek-harness|deepseekAccount|deepseeksvc|session-log-deepseek|plugin-package-inventory|dsh_session_log|dsh_plugin_packages|ori_question|DSH_TELEMETRY' packages apps --include='*.ts' --include='*.tsx' --include='*.yml' --exclude-dir=node_modules --exclude-dir=lib
 ```

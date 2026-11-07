@@ -115,28 +115,6 @@ describe('DeepSeekSearchApiProvider request mapping', () => {
     expect(JSON.parse(init.body)).toEqual(expected)
   })
 
-  it.each([
-    ['the collapsed question', '  How do\n\tI  install it?  ', 'How do I install it?'],
-    ['the first 128 characters', `${'问'.repeat(127)}题题`, `${'问'.repeat(127)}题`],
-    ['whole surrogate pairs', `${'a'.repeat(127)}😀😀`, `${'a'.repeat(127)}😀`],
-  ])('sends %s as ori_question', async (_case, question, expected) => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(searchResponse()))
-    vi.stubGlobal('fetch', fetchMock)
-    await searchProvider({ ...options, originalQuestion: () => question }).search({ query: 'q', maxResults: 8 })
-    const body = fetchMock.mock.calls[0]?.[1]?.body
-    if (typeof body !== 'string') throw new Error('expected JSON request body')
-    expect(JSON.parse(body)).toEqual({ query: 'q', count: 8, need_content: false, ori_question: expected })
-  })
-
-  it.each([undefined, '', ' \n '])('omits ori_question for question %j', async (question) => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(searchResponse()))
-    vi.stubGlobal('fetch', fetchMock)
-    await searchProvider({ ...options, originalQuestion: () => question }).search({ query: 'q' })
-    const body = fetchMock.mock.calls[0]?.[1]?.body
-    if (typeof body !== 'string') throw new Error('expected JSON request body')
-    expect(JSON.parse(body)).not.toHaveProperty('ori_question')
-  })
-
   it('forwards the abort signal', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(searchResponse()))
     vi.stubGlobal('fetch', fetchMock)
@@ -189,7 +167,7 @@ describe('Search API request pacing', () => {
   })
 })
 
-describe('Search API triggering question', () => {
+describe('Search API request inside a conversation', () => {
   type DerivedMessage = ReturnType<Session['deriveMessages']>[number]
 
   /** One derived user-role message with the given source and blocks. */
@@ -229,12 +207,8 @@ describe('Search API triggering question', () => {
     } finally { await ctx.fiber.dispose() }
   }
 
-  it('sends the latest human prompt as ori_question', async () => {
-    expect(await searchFromPrompt()).toMatchObject({ ori_question: 'What changed in DeepSeek V4?' })
-  })
-
-  it('omits ori_question when sending it is disabled', async () => {
-    expect(await searchFromPrompt({ sendOriginalQuestion: false })).not.toHaveProperty('ori_question')
+  it('sends only the query, count, and content flag, never the user prompt', async () => {
+    expect(await searchFromPrompt()).toEqual({ query: 'DeepSeek V4', count: 10, need_content: false })
   })
 })
 

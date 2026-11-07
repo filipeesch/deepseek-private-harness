@@ -17,10 +17,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # CI runs must never report to the telemetry endpoint baked into apps/cli/cordis.yml.
-  DSH_TELEMETRY_DISABLED: '1'
-
 # A new push supersedes the pull-request run in progress; master runs always complete.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

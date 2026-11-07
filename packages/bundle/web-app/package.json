@@ -72,7 +72,6 @@
     "@deepseek-ai/dsh-client-hmr": "workspace:*",
     "@deepseek-ai/dsh-client-locale": "workspace:*",
     "@deepseek-ai/dsh-client-modules": "workspace:*",
-    "@deepseek-ai/dsh-client-product-analytics": "workspace:*",
     "@deepseek-ai/dsh-client-resources": "workspace:*",
     "@deepseek-ai/dsh-client-shortcuts": "workspace:*",
     "@deepseek-ai/dsh-client-ui-agent-preset": "workspace:*",
@@ -110,7 +109,6 @@
     "@deepseek-ai/dsh-client-ui-settings-models": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-plugin-inventory": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-plugins": "workspace:*",
-    "@deepseek-ai/dsh-client-ui-settings-session-log": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-shell": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-subagent": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings-web-search": "workspace:*",
@@ -146,7 +144,6 @@
     "@deepseek-ai/dsh-host-frontend-static": "workspace:*",
     "@deepseek-ai/dsh-host-open-in-app": "workspace:*",
     "@deepseek-ai/dsh-host-plugin-inventory": "workspace:*",
-    "@deepseek-ai/dsh-host-product-telemetry-otel": "workspace:*",
     "@deepseek-ai/dsh-host-webserver": "workspace:*",
     "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-mcp-manager": "workspace:*",
@@ -212,7 +209,6 @@
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-shell-env": "workspace:*",
     "@deepseek-ai/dsh-typert-registry": "workspace:*",
-    "@deepseek-ai/libreoffice-kit": "^0.1.5",
-    "@deepseek-ai/dsh-otel": "workspace:*"
+    "@deepseek-ai/libreoffice-kit": "^0.1.5"
   }
 }

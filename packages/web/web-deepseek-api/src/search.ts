@@ -21,9 +21,6 @@ export const DEEPSEEK_DEFAULT_COUNT = 10
 /** Default Search requests started per second, the service's account-wide 5 QPS limit. */
 export const DEEPSEEK_SEARCH_REQUESTS_PER_SECOND = 5
 
-/** Longest `ori_question` the Search API accepts, in characters. */
-const ORIGINAL_QUESTION_MAX_CHARS = 128
-
 /** Authentication, endpoint, and result settings snapshotted for one search. */
 export interface DeepSeekSearchApiOptions {
   /** API base the API key is sent to, including its path prefix; `/search` is appended. */
@@ -36,8 +33,6 @@ export interface DeepSeekSearchApiOptions {
   count: number
   /** Most Search requests this provider starts in any one-second window. */
   requestsPerSecond: number
-  /** Read the user question that triggered the search; undefined or blank sends none. */
-  originalQuestion?: () => string | undefined
 }
 
 /**
@@ -99,7 +94,6 @@ export class DeepSeekSearchApiProvider implements WebSearchProvider {
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
     const options = this.resolveOptions()
-    const question = boundedQuestion(options.originalQuestion?.())
     return dispatchDeepSeekWeb(options.auth, {
       baseURL: options.baseURL,
       path: '/search',
@@ -107,7 +101,6 @@ export class DeepSeekSearchApiProvider implements WebSearchProvider {
         query: request.query,
         count: Math.min(options.count, request.maxResults ?? options.count),
         need_content: false,
-        ...question === undefined ? {} : { ori_question: question },
       },
       decode: mapSearchResponse,
       waitToSend: waitSignal => this.waitForRequestSlot(options.requestsPerSecond, waitSignal),
@@ -151,18 +144,6 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
     }, ms)
     signal?.addEventListener('abort', onAbort, { once: true })
   })
-}
-
-/**
- * Bound the triggering question to what `ori_question` accepts: whitespace
- * collapses to single spaces and the first 128 characters remain.
- * @param question - the user question, when one exists.
- * @returns the bounded question, or undefined when nothing remains.
- */
-function boundedQuestion(question: string | undefined): string | undefined {
-  const collapsed = question?.replace(/\s+/gu, ' ').trim() ?? ''
-  if (collapsed.length === 0) return undefined
-  return Array.from(collapsed).slice(0, ORIGINAL_QUESTION_MAX_CHARS).join('')
 }
 
 /** True for positive integral request limits. */
