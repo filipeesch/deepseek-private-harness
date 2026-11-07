@@ -22,6 +22,12 @@ const OFFICIAL_CLIENT_BUILD_ENVIRONMENT = {
   DSH_CLIENT_TITLE: 'DeepSeek Harness',
 } as const
 
+/** Public client environment this distribution's local builds present. */
+const LOCAL_CLIENT_BUILD_ENVIRONMENT = {
+  DSH_CLIENT_BUILD_PROFILE: 'local',
+  DSH_CLIENT_TITLE: 'DSH Private',
+} as const
+
 /** Public variable carrying the source commit embedded in client artifacts. */
 const CLIENT_COMMIT_HASH_VARIABLE = 'DSH_CLIENT_COMMIT_HASH'
 
@@ -127,6 +133,7 @@ export function repositoryClientBuildEnvironment(
   const dirty = repositoryGitDirty(root)
   return {
     ...inherited,
+    ...LOCAL_CLIENT_BUILD_ENVIRONMENT,
     DSH_CLIENT_COMMIT_HASH: repositoryCommitHash(root, environment),
     ...(dirty === true ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
     DSH_CLIENT_VERSION: repositoryVersion(root),
@@ -205,7 +212,7 @@ export function resolveClientBuildEnvironment(
       DSH_CLIENT_COMMIT_HASH: commitHash,
       DSH_CLIENT_VERSION: version,
       ...(profile === 'official' ? OFFICIAL_CLIENT_BUILD_ENVIRONMENT : {
-        DSH_CLIENT_BUILD_PROFILE: 'local',
+        ...LOCAL_CLIENT_BUILD_ENVIRONMENT,
         ...(environment.DSH_CLIENT_GIT_DIRTY === 'true' ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
       }),
     }

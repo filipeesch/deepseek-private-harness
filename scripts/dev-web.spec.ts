@@ -131,8 +131,10 @@ it('samples one local environment at startup without validating watcher outputs'
       DSH_CLIENT_EXTRA: 'launch-value',
     })).toEqual({
       PATH: '/bin',
+      DSH_CLIENT_BUILD_PROFILE: 'local',
       DSH_CLIENT_COMMIT_HASH: 'abc1234',
       DSH_CLIENT_EXTRA: 'launch-value',
+      DSH_CLIENT_TITLE: 'DSH Private',
       DSH_CLIENT_VERSION: '1.2.3',
     })
   } finally {

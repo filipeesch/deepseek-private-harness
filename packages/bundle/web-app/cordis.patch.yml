@@ -318,6 +318,10 @@
     - id: ui-brand-official
       name: '@deepseek-ai/dsh-client-ui-brand-official'
 
+    # Private distribution name for the sidebar brand-name seat (non-official builds).
+    - id: ui-brand-private
+      name: '@deepseek-ai/dsh-client-ui-brand-private'
+
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'
 

@@ -1,0 +1,43 @@
+/* The shell hands this seat a 24px row and keeps the whale mark in the
+   sibling slot. Name and version split that row evenly: 12px each, so the
+   11px version stays legible instead of the 6px badge the fallback used. */
+.root {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  height: 24px;
+}
+
+.name {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Same inverted pill as the shell fallback, sized for 11px text. Copying the
+   version stays a click affordance even where the surrounding brand is a
+   window-drag surface. */
+.version {
+  flex: none;
+  align-self: flex-start;
+  max-width: 100%;
+  height: 12px;
+  padding: 0 3px;
+  border-radius: 2px;
+  color: var(--dsw-alias-label-primary-inverted);
+  background: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}

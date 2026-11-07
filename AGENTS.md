@@ -4,7 +4,7 @@ DeepSeek Harness is an all-plugin Cordis agent harness. Read [docs/architecture.
 
 ## Private distribution
 
-This is `filipeesch/deepseek-private-harness`, a private distribution of `deepseek-ai/deepseek-harness` (remote `upstream`). Invariant: send nothing to external parties except model, search, and plugin requests the user configures — no telemetry, analytics, feedback upload, usage identifiers, Session-log upload, or account Sign In. When syncing upstream, the private side wins every conflict touching this invariant; never run `gh repo sync --force`. Upstream CI and governance are removed; `.github/workflows/private-ci.yml` runs on GitHub-hosted runners and its `private-ci passed` job is the required merge check. Read [PRIVATE.md](PRIVATE.md) before merging upstream or touching network, telemetry, account, or update code.
+This is `filipeesch/dsh-private`, a private distribution of `deepseek-ai/deepseek-harness` (remote `upstream`). Invariant: send nothing to external parties except model, search, and plugin requests the user configures — no telemetry, analytics, feedback upload, usage identifiers, Session-log upload, or account Sign In. When syncing upstream, the private side wins every conflict touching this invariant; never run `gh repo sync --force`. Upstream CI and governance are removed; `.github/workflows/private-ci.yml` runs on GitHub-hosted runners and its `private-ci passed` job is the required merge check. Read [PRIVATE.md](PRIVATE.md) before merging upstream or touching network, telemetry, account, or update code.
 
 ## Pre-stable APIs and released Session data
 
