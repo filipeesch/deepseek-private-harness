@@ -791,19 +791,13 @@ describe('web e2e: seeded history renders through cold resume', () => {
       if (agent === undefined) throw new Error('seeded session did not attach an agent')
       const done = agent.session.snapshotEvents().filter(event => event.type === 'command/done').at(-1)
       if (done?.type !== 'command/done') throw new Error('feedback command did not settle')
-      const [sessionLine, userLine, extraLine] = done.data.text?.split('\n') ?? []
-      expect(sessionLine).toBe(`Feedback recorded for session ${SEED_ID}`)
-      expect(userLine).toMatch(/^Anonymous user: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.$/i)
-      expect(extraLine).toBeUndefined()
-      const userId = userLine?.match(/^Anonymous user: ([0-9a-f-]+)/i)?.[1]
-      if (userId === undefined) throw new Error('feedback command omitted the user id')
+      expect(done.data.text).toBe(`Feedback recorded for session ${SEED_ID}`)
 
       // command/done can arrive before the submit reply releases the composer.
       await expect.poll(() => input.textContent(), { timeout: 10_000 }).toBe('')
       await expect.poll(() => page.getByRole('button', { name: 'Add files or run commands' }).isEnabled(), { timeout: 10_000 }).toBe(true)
       const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
         .split(SEED_ID).join('{{seededId}}')
-        .split(userId).join('{{userId}}')
       await compareOrRefreshGolden(FEEDBACK_ROW_EXPECTED, snapshot, MODE)
     } finally {
       if (previousDshHome === undefined) delete process.env.DSH_HOME

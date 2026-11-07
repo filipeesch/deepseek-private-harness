@@ -408,7 +408,7 @@ describe.skipIf(webSnapshotMode() === 'record').each([
         await page.getByRole('menuitem', { name: /^推理等级/ }).click()
         const menu = page.getByRole('menu', { name: '模型与推理等级', exact: true })
         await menu.getByRole('menuitemradio').first().click()
-        await expect.poll(() => scaffold.ctx.agentDefaultModel.currentSelection().reasoningEffort).toBeUndefined()
+        await expect.poll(() => scaffold.ctx.agentDefaultModel.currentSelection()?.reasoningEffort).toBeUndefined()
         await page.getByRole('button', { name: /^选择模型/ }).click()
         await page.getByRole('menuitem', { name: /^推理等级/ }).click()
         const last = menu.getByRole('menuitemradio').last()

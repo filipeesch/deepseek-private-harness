@@ -35,9 +35,6 @@ concurrency:
   group: private-desktop-release
   cancel-in-progress: false
 
-env:
-  DSH_TELEMETRY_DISABLED: '1'
-
 jobs:
   prepare:
     name: Resolve release
