@@ -36,7 +36,7 @@ Status: proposed
 
 ### Authorization 丢失必需的提交观察或已接受的凭据写入
 
-**所有者与证据。** Authorization 的[提交观察器 (`AuthorizationService.attempt`)](../../../../packages/credentials/authorization/src/index.ts)是调用方拥有的 `ctx.on` effect。[提交操作 (`AuthorizationService.attempt`)](../../../../packages/credentials/authorization/src/index.ts)等待凭据存储，而[成功要求观察到更新 (`AuthorizationService.attempt`)](../../../../packages/credentials/authorization/src/index.ts)。账号服务[不会中止正在提交的尝试，并等待其完成 (`PlatformAccount`)](../../../../packages/credentials/deepseek-account-platform/src/index.ts)。
+**所有者与证据。** Authorization 的[提交观察器 (`AuthorizationService.attempt`)](../../../../packages/credentials/authorization/src/index.ts)是调用方拥有的 `ctx.on` effect。[提交操作 (`AuthorizationService.attempt`)](../../../../packages/credentials/authorization/src/index.ts)等待凭据存储，而[成功要求观察到更新 (`AuthorizationService.attempt`)](../../../../packages/credentials/authorization/src/index.ts)。
 
 **写入成功，却报告失败。** 暂停凭据写入，释放账号消费者，再完成写入并发出更新。观察器可以与账号的排空并发自动退订；随后 Authorization 即使存储成功也会以 `NOT_COMMITTED` 拒绝。应让操作拥有观察器直到结果确定，或直接确认成功的 `session.commit`，同时给旧式直接写入观察明确的生命周期。使用实际 Cordis 与 Authorization、配合延迟的内存凭据 provider 的实验，复现了 provider 写入成功后返回 `NOT_COMMITTED`；完整浏览器登录路径由源码追踪确认。
 
@@ -64,7 +64,7 @@ Status: proposed
 
 当前 AgentLoop 的组合 effect 在 ownership 释放期间保留 projection 注册，因此排除早先的 projection 候选。Jobs 取消已等待结束。Working-directory 和 title 工作在 await 后重新检查取消。Projection-cache 失败明确允许可重建数据降级；已检查的生产 telemetry 消费者按需调用。Session history 的 promotion 候选涉及排空快照之后接纳新工作，没有确认提前释放的清理依赖，因此不纳入本次聚焦规则。
 
-活动 Note 替代审查保留并交叉链接了上面的基于句柄的持久化决定与逻辑会话存储提案：只有有序关闭时的尾部保留发生重叠，而它们的句柄 API、格式、存储分离及其他理由仍然适用。本提案没有完整替代任何 implemented Note。[Host schedule 存储决定](../../implemented/architecture/2026-09-16-host-schedule-storage.zh.md)、[授权流程决定](../../implemented/architecture/2026-08-13-credential-records-and-authorization-flows.zh.md)和[账号登录决定](../../implemented/architecture/2026-09-14-deepseek-account-login.zh.md)继续生效：独立任务权威、当次提交证据与已准入提交的完成仍然必要。已有的 configured 记录不能替代本次尝试成功提交的证据。[Windows ACL sandbox 决定](../../implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.zh.md)也继续生效：临时能力仍可撤销，但最终撤销应排在进程生命周期结束之后。本提案补充缺失的跨所有者释放要求。
+活动 Note 替代审查保留并交叉链接了上面的基于句柄的持久化决定与逻辑会话存储提案：只有有序关闭时的尾部保留发生重叠，而它们的句柄 API、格式、存储分离及其他理由仍然适用。本提案没有完整替代任何 implemented Note。[Host schedule 存储决定](../../implemented/architecture/2026-09-16-host-schedule-storage.zh.md)和[授权流程决定](../../implemented/architecture/2026-08-13-credential-records-and-authorization-flows.zh.md)继续生效：独立任务权威、当次提交证据与已准入提交的完成仍然必要。已有的 configured 记录不能替代本次尝试成功提交的证据。[Windows ACL sandbox 决定](../../implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.zh.md)也继续生效：临时能力仍可撤销，但最终撤销应排在进程生命周期结束之后。本提案补充缺失的跨所有者释放要求。
 
 ## 考虑过的替代方案
 
