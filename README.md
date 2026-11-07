@@ -14,6 +14,24 @@ DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL B
 
 Review the [safety notice](SAFETY.md) before running the project.
 
+## Private distribution
+
+This repository is a private distribution of DeepSeek Harness with no telemetry, analytics, usage identifiers, Session-log upload, or account Sign In. It ships no Desktop installers, releases, or auto-update; everyone runs the Web version from source. Maintainers read [PRIVATE.md](PRIVATE.md) before syncing upstream.
+
+Requirements: Node.js 24.9 or later and pnpm. Clone this repository, then run:
+
+```sh
+pnpm install
+pnpm run build:artifacts
+make web
+```
+
+`make web` serves the built Web UI at `http://127.0.0.1:3080` and opens it in the default browser. Add your `DEEPSEEK_API_KEY` or another provider's key under Settings → Models when the UI asks for it, or export the key before launching ([providers guide](docs/user/guide/providers.md)).
+
+To update, run `git pull`, `pnpm install`, `pnpm run build:artifacts`, then `make web`.
+
+Do not run `npx @deepseek-ai/dsh web` or the upstream clone commands below for this distribution: they fetch the upstream package and sources, which these guarantees do not cover.
+
 ## Run
 
 ### Run from `npm`

@@ -140,7 +140,7 @@ jobs:
       - name: Check Loader internal shape detection
         run: pnpm exec vitest run packages/boot/app-boot/tests/loader-shape.compat.spec.ts
 
-  # Desktop ships for Windows x64 only; this builds the workspace and the production documentation site natively.
+  # Windows is a supported platform for running the Web version from source; this builds the workspace and the production documentation site natively.
   windows-build:
     name: windows build
     runs-on: windows-latest
