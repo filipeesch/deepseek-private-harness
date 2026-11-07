@@ -119,6 +119,7 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'workspace/insertSessionBefore': 'owner-only', // owner reorders Sessions
   'workspace/pinSession': 'owner-only', // owner pins a Session
   'workspace/rename': 'owner-only', // owner renames a Workspace
+  'workspace/setHidden': 'owner-only', // owner hides a Workspace from its own browsing surfaces
   'workspace/unarchiveSession': 'owner-only', // owner unarchives a Session
   'workspace/unpinSession': 'owner-only', // owner unpins a Session
   'workspaceFiles/changes': 'owner-only', // owner Workspace file access

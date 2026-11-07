@@ -137,6 +137,44 @@ describe('WorkspaceController commands', () => {
     })
   })
 
+  it('creates a hidden Workspace and toggles the flag through setHidden', async () => {
+    const { controller, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'hidden'), hidden: true })
+    expect(created).toMatchObject({ created: true, workspace: { hidden: true } })
+
+    // Re-adoption resolves the durable record and leaves its flag alone.
+    await expect(controller.create({ path: created.workspace.path })).resolves.toMatchObject({
+      created: false,
+      workspace: { workspaceId: created.workspace.workspaceId, hidden: true },
+    })
+
+    const workspaceId = created.workspace.workspaceId
+    await expect(controller.setHidden({ workspaceId, hidden: false }))
+      .resolves.toMatchObject({ workspace: { workspaceId, hidden: false } })
+    // Setting the value it already has resolves without a visible change.
+    await expect(controller.setHidden({ workspaceId, hidden: false }))
+      .resolves.toMatchObject({ workspace: { workspaceId, hidden: false } })
+    await expect(controller.setHidden({ workspaceId: 'missing' as WorkspaceId, hidden: true }))
+      .rejects.toMatchObject({ code: 'workspace/not-found' })
+  })
+
+  it('keeps the later flag when overlapping setHidden calls race the durable write', async () => {
+    const { controller, ctx, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'racing') })
+    const workspaceId = created.workspace.workspaceId
+
+    // Both calls start before either write settles, so a precheck reading the
+    // entity snapshot would drop the second request and commit the first.
+    await Promise.all([
+      controller.setHidden({ workspaceId, hidden: true }),
+      controller.setHidden({ workspaceId, hidden: false }),
+    ])
+
+    expect(ctx.workspaceRegistry.get(workspaceId)?.hidden).toBe(false)
+    await expect(controller.setHidden({ workspaceId, hidden: true }))
+      .resolves.toMatchObject({ workspace: { workspaceId, hidden: true } })
+  })
+
   it('maps invalid paths, blank names, conflicts, and unknown ids to stable failures', async () => {
     const { controller, root } = await harness()
     const first = await controller.create({ path: stageDir(root, 'first') })
@@ -443,6 +481,34 @@ describe('WorkspaceController follow', () => {
 
     abort.abort()
     await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+  })
+
+  it('carries the hidden flag on every row and delivers a flag change as one updated row', async () => {
+    const { controller, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'flagged'), hidden: true })
+    const workspaceId = created.workspace.workspaceId
+
+    const abort = new AbortController()
+    const iterator = controller.follow(abort.signal)[Symbol.asyncIterator]()
+    await expect(nextFrame(iterator)).resolves.toMatchObject({
+      type: 'baseline',
+      value: { items: [{ workspaceId, hidden: true }] },
+    })
+
+    await controller.setHidden({ workspaceId, hidden: false })
+    await expect(nextFrame(iterator)).resolves.toMatchObject({
+      type: 'upsert',
+      workspace: { workspaceId, hidden: false },
+    })
+    abort.abort()
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+
+    // A reconnect reads the current value from its own opening projection.
+    const reconnected = controller.follow(new AbortController().signal)[Symbol.asyncIterator]()
+    await expect(nextFrame(reconnected)).resolves.toMatchObject({
+      type: 'baseline',
+      value: { items: [{ workspaceId, hidden: false }] },
+    })
   })
 
   it('follows only the Workspaces and Sessions a non-owner may follow', async () => {

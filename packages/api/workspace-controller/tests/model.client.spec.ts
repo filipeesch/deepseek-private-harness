@@ -16,6 +16,7 @@ import type {
   WorkspacePinSessionRequest,
   WorkspacePinValue,
   WorkspaceRenameRequest,
+  WorkspaceSetHiddenRequest,
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
@@ -33,6 +34,7 @@ function workspace(
   id: string,
   sessionIds: readonly SessionId[] = [],
   updatedAt = '2026-01-01T00:00:00.000Z',
+  hidden = false,
 ): WorkspaceView {
   return {
     workspaceId: wid(id),
@@ -41,6 +43,7 @@ function workspace(
     sessionIds,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt,
+    hidden,
   }
 }
 
@@ -75,6 +78,8 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
     Promise.resolve(remoteOk({ workspace: workspace(request.path.split('/').pop() ?? 'workspace'), created: true }))
   onRename: (request: WorkspaceRenameRequest) => Promise<RemoteResult<WorkspaceValue>> = request =>
     Promise.resolve(remoteOk({ workspace: { ...workspace(String(request.workspaceId)), title: request.title } }))
+  onSetHidden: (request: WorkspaceSetHiddenRequest) => Promise<RemoteResult<WorkspaceValue>> = request =>
+    Promise.resolve(remoteOk({ workspace: { ...workspace(String(request.workspaceId)), hidden: request.hidden } }))
   onDelete: (_request: WorkspaceDeleteRequest) => Promise<RemoteResult<WorkspaceDeleteValue>> = () =>
     Promise.resolve(remoteOk({ deleted: true }))
   onInsertBefore: (
@@ -111,6 +116,11 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   rename(request: WorkspaceRenameRequest): Promise<RemoteResult<WorkspaceValue>> {
     this.record('rename', request)
     return this.onRename(request)
+  }
+
+  setHidden(request: WorkspaceSetHiddenRequest): Promise<RemoteResult<WorkspaceValue>> {
+    this.record('setHidden', request)
+    return this.onSetHidden(request)
   }
 
   delete(request: WorkspaceDeleteRequest): Promise<RemoteResult<WorkspaceDeleteValue>> {
@@ -195,12 +205,14 @@ describe('ClientWorkspaceModel', () => {
     const model = modelFor()
     expect(model.getSnapshot()).toMatchObject({ phase: 'pending', state: 'loading' })
     baseline(model, [workspace('old'), workspace('kept')])
-    model.upsertView(workspace('new'))
+    model.upsertView(workspace('new', [], '2026-01-01T00:00:00.000Z', true))
     model.replaceOrder([wid('kept'), wid('new'), wid('old')])
     model.replaceArchived([sid('hidden')])
     model.removeView(wid('old'))
     expect(model.getSnapshot()).toMatchObject({ phase: 'ready', state: 'idle', archivedSessionIds: ['hidden'] })
     expect(model.getSnapshot().items.map(item => item.workspaceId)).toEqual(['kept', 'new'])
+    // The row's hidden flag rides the same upsert as every other field.
+    expect(model.getSnapshot().items.map(item => item.hidden)).toEqual([false, true])
 
     baseline(model, [workspace('fresh')])
     expect(model.getSnapshot().items.map(item => item.workspaceId)).toEqual(['fresh'])

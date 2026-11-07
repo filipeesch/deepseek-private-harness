@@ -50,14 +50,17 @@ kind: "package-reference"
 
 ### 创建与排序项目
 
-从任何已存在的绝对目录路径创建项目：`C:\` 等文件系统根目录和普通目录都有效。相对路径、`C:work` 等 Windows 盘符相对路径、不存在的路径和文件都会被拒绝，且不会创建项目；为已有项目的目录再次创建会原样返回现有项目。你可以随时重命名项目，并把它移动到列表中的任意位置：
+从任何已存在的绝对目录路径创建项目：`C:\` 等文件系统根目录和普通目录都有效。相对路径、`C:work` 等 Windows 盘符相对路径、不存在的路径和文件都会被拒绝，且不会创建项目；为已有项目的目录再次创建会原样返回现有项目，包括其标题与隐藏标记。你可以随时重命名项目、把它移动到列表中的任意位置，并在插件代读者管理项目时将其标记为隐藏：
 
 ```text
 // Host consumer code, after the composition above is loaded:
-const project = await ctx.workspaceRegistry.create('/path/to/dir', 'My Project')
+const project = await ctx.workspaceRegistry.create('/path/to/dir', { title: 'My Project', hidden: true })
 await project.setTitle('Renamed')
+await project.setHidden(false)
 ctx.workspaceRegistry.list() // shows the project, newest first
 ```
+
+创建选项只作用于新记录。隐藏标记默认为可见，因此登记内部项目的插件可以在同一次持久化写入中把它移出读者的浏览界面，而不必再写一次。
 
 <a id="first-use-workspace"></a>
 ### 首次使用工作区
@@ -75,6 +78,8 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 ### 隐藏、恢复会话与移除项目
 
 当会话不应再出现在分组中时隐藏它：它会从可见列表中消失，但其会话、历史与在项目中的位置都保持不变。仍有工作在跑的会话——它自己的回合、运行中的子代理、后台任务或活跃提醒——不会被藏在这些工作之下：注册表会拒绝并列出还在跑的内容；调用方若要求先停止这些工作，注册表会按用户自己的停止操作同样的方式停掉它们，然后再隐藏。当被隐藏的会话应重新出现时恢复它：它会回到其项目下记录的位置；不属于任何项目时则回到 Ungrouped，并从一份正常收尾的日志继续对话。项目不再需要时移除它：它离开列表，而其文件夹、文件与会话历史绝不受影响——这些会话变成 Ungrouped。之后再次添加同一目录会从空项目开始，不会带回旧会话。
+
+隐藏项目是另一个项目级选择：项目及其会话离开浏览器的浏览界面，而记录、文件夹与会话记账保持不变，再次显示时恢复已保存的顺序。该标记只影响呈现——在隐藏项目中创建会话、打开既有会话、重命名、排序与跟随投影的行为都与可见项目相同。这些界面如何应用该标记由 [Web 客户端](../../client/ui-workspace/README.zh.md#hidden-workspaces)负责。
 
 Workspace 注册不意味着拥有其目录。未来的破坏性文件系统操作必须单独命名、获得明确确认，并执行所有权与安全检查。
 
@@ -99,7 +104,7 @@ Workspace 注册不意味着拥有其目录。未来的破坏性文件系统操�
 <a id="api-behavior"></a>
 ### API 行为
 
-该 API 由两个对象负责：`WorkspaceRegistry` 创建、排序与删除项目，管理会话记账，并置顶、取消置顶、归档或恢复会话；`Workspace` 实体暴露显示标题、目录状态与会话投影。置顶要求会话已知且未归档；归档在同一次持久化写入中清除置顶，恢复会话不会恢复置顶。各方法的精确约定见 [src/index.ts](src/index.ts) 与 [src/entity.ts](src/entity.ts)。
+该 API 由两个对象负责：`WorkspaceRegistry` 创建、排序与删除项目，管理会话记账，并置顶、取消置顶、归档或恢复会话；`Workspace` 实体暴露显示标题、隐藏标记、目录状态与会话投影。`setTitle` 与 `setHidden` 是仅有的两个持久化属性写入；把标记设成项目已有的值会不写入直接返回，除了每次被接受的变更都会执行的候选项修剪。置顶要求会话已知且未归档；归档在同一次持久化写入中清除置顶，恢复会话不会恢复置顶。各方法的精确约定见 [src/index.ts](src/index.ts) 与 [src/entity.ts](src/entity.ts)。
 
 归档准入是本包声明并派发的两个宿主事件之上的能力接缝：`workspace/session-activity`（waterfall）向已组合的提供方询问某会话还有什么在跑，`workspace/session-stop`（parallel）请它们停止这些工作。`archiveSession(sessionId)` 只询问一次活动 waterfall，对非空答案以 `WorkspaceActiveSessionError` 拒绝，其 `activity` 按族列出各项——键由各提供方自己合并进本包留空的 `SessionActivityKindMap`；`archiveSession(sessionId, { stopActivity: true })` 跳过活动检查，先写入归档，再派发停止事件，因此持久化的归档集合已经拦住停止所引发的每一次唤醒；提供方抛错只记日志，归档保留。调用在每个提供方的停止请求都已发出后返回，被停止的工作自行收敛。两种询问都在存在性检查之后进行，对已归档 id 从不发生。随附的提供方是 Agent 注册表（运行中的回合）、任务注册表接缝（所属任务）、Subagent runtime（运行中的子孙）与 Schedule 插件（活跃提醒）；没有提供方的组合可自由归档。
 
@@ -115,7 +120,7 @@ Workspace 注册不意味着拥有其目录。未来的破坏性文件系统操�
 
 ### 持久形态
 
-注册表打开 `workspace` 领域（版本 2）：一张以 `WorkspaceId` 为键的 `workspaces` 表，加上一个持有 `workspaceIds`（权威显示顺序）、`archivedSessionIds`、`pinnedSessionIds`、可选的首次使用身份 `defaultWorkspaceId` 与可选 `pendingMutation` 标记的全局状态。归档与置顶集合存储会话 id 字符串，默认值为空，不包含逐项对象或时间戳；置顶数组把最近置顶的 id 放在前面。归档在同一次全局状态写入中清除置顶，但不改变 Workspace 成员关系。取消归档不做会话存在性探测，因为从集合中移除 id 不可能引入未知 id，而归档会在加入前校验会话。
+注册表打开 `workspace` 领域（版本 2）：一张以 `WorkspaceId` 为键的 `workspaces` 表，加上一个持有 `workspaceIds`（权威显示顺序）、`archivedSessionIds`、`pinnedSessionIds`、可选的首次使用身份 `defaultWorkspaceId` 与可选 `pendingMutation` 标记的全局状态。每条记录持有其规范路径、显示标题、有序会话记账、创建与变更时刻以及隐藏标记；隐藏标记默认为 false，因此在该字段出现之前写入的记录读作可见。归档与置顶集合存储会话 id 字符串，默认值为空，不包含逐项对象或时间戳；置顶数组把最近置顶的 id 放在前面。归档在同一次全局状态写入中清除置顶，但不改变 Workspace 成员关系。取消归档不做会话存在性探测，因为从集合中移除 id 不可能引入未知 id，而归档会在加入前校验会话。
 
 ### 生命周期
 
@@ -181,8 +186,8 @@ Workspace 注册不意味着拥有其目录。未来的破坏性文件系统操�
 
 本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-#### 开放：`create(path, title?)` 的 title 参数
+#### 开放：`create` 的 title 选项
 
-网关的按名称创建分支移除后，`title` 参数已无生产调用方；代码中的 TODO 提议把该参数与其 `@param` 子句一并移除（参见[笔记](../../../.agents/notes/archived/simplification/2026-07-31-one-route-to-add-a-workspace.md)）。
+网关的按名称创建分支移除后，`title` 选项已无生产调用方；代码中的 TODO 提议把该选项与其 `@param` 子句一并移除（参见[笔记](../../../.agents/notes/archived/simplification/2026-07-31-one-route-to-add-a-workspace.md)）。
 
 </details>

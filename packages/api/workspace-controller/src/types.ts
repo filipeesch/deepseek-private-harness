@@ -27,6 +27,8 @@ export interface WorkspaceView {
   readonly createdAt: string
   /** ISO-8601 last-mutation instant. */
   readonly updatedAt: string
+  /** Whether browsing surfaces omit this Workspace and its Sessions. */
+  readonly hidden: boolean
 }
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
@@ -64,6 +66,18 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 /** Existing directory requested for Workspace adoption. */
 export interface WorkspaceCreateRequest {
   readonly path: string
+  /**
+   * Register a new Workspace hidden from browsing surfaces. Resolving an
+   * already-registered directory leaves that Workspace's flag unchanged.
+   */
+  readonly hidden?: boolean
+}
+
+/** Requested change of one Workspace's hidden flag. */
+export interface WorkspaceSetHiddenRequest {
+  readonly workspaceId: WorkspaceId
+  /** `true` omits the Workspace from browsing surfaces; `false` shows it again. */
+  readonly hidden: boolean
 }
 
 /** Created or previously registered Workspace. */

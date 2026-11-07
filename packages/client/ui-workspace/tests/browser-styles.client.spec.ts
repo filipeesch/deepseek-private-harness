@@ -199,6 +199,15 @@ describe('WorkspaceBrowser.module.css list', () => {
       .toBe('linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent)')
   })
 
+  it('caps the trailing action cluster at the controls it holds, reveal control included', () => {
+    // Three 28px actions with the 4px gap need 92px; the default two need 60px.
+    expect(declarations('.headerActions')?.get('max-width')).toBe('60px')
+    expect(declarations('.headerActionsWithReveal')?.get('max-width')).toBe('92px')
+    expect(declarations('.headerActions')?.get('overflow')).toBe('hidden')
+    // The collapse rule follows the wider cap, so hiding search still wins.
+    expect(declarations('.headerActionsHidden')?.get('max-width')).toBe('0')
+  })
+
   it('pins both rail controls to the shared left anchor during the column slide', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')

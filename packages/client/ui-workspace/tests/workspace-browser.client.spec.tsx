@@ -68,9 +68,10 @@ const sessionState = (
     byId: { ...state.byId, [main]: { ...row, retainedBy: { ...row.retainedBy, mainView: 1 } } },
   }
 }
-const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView => ({
+const workspace = (id: string, sessionIds: string[], title = id, hidden = false): WorkspaceView => ({
   workspaceId: wid(id), path: `/projects/${id}`, title,
   sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  hidden,
 })
 const workspaceState = (
   items: readonly WorkspaceView[],
@@ -2837,5 +2838,187 @@ describe('Workspace tree grouping', () => {
     fireEvent.dragEnd(alpha)
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledOnce()
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledWith(wid('alpha'), wid('gamma'))
+  })
+})
+
+describe('hidden Workspaces', () => {
+  /** Row labels in render order, read from the accessible row content. */
+  const rowLabels = (): string[] => screen.getAllByRole('treeitem')
+    .filter(row => row.getAttribute('aria-expanded') === null)
+    .map(row => row.textContent ?? '')
+
+  it('omits a hidden Workspace and keeps its Sessions out of the ungrouped bucket', () => {
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupExpanded('hidden-workspace', true)
+    preferences.actions.setGroupExpanded(UNGROUPED_KEY, true)
+    mount({
+      useStore: bindSnapshotSelector(preferences),
+      actions: preferences.actions,
+      useSessions: hook(sessionState([summary('hidden-session', 20), summary('loose', 10)])),
+      useWorkspaces: hook(workspaceState([
+        workspace('hidden-workspace', ['hidden-session'], 'Hidden project', true),
+      ])),
+    })
+
+    expect(screen.queryByText('Hidden project')).toBeNull()
+    expect(screen.queryByText('hidden-session')).toBeNull()
+    expect(screen.getByText('loose')).toBeTruthy()
+    expect(screen.getByText('未分组')).toBeTruthy()
+  })
+
+  it('renders the hidden Workspace holding the open Session and drops it when the selection moves', () => {
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupExpanded('hidden-workspace', true)
+    preferences.actions.setGroupExpanded('shown', true)
+    const b = mount({
+      useStore: bindSnapshotSelector(preferences),
+      actions: preferences.actions,
+      useSessions: hook(sessionState([summary('hidden-session', 20)], { main: sid('hidden-session') })),
+      useWorkspaces: hook(workspaceState([
+        workspace('shown', ['shown-session'], 'Shown'),
+        workspace('hidden-workspace', ['hidden-session'], 'Hidden project', true),
+      ])),
+    })
+
+    expect(screen.getByText('Hidden project')).toBeTruthy()
+    expect(screen.getByText('hidden-session')).toBeTruthy()
+    fireEvent.click(screen.getByText('hidden-session'))
+    expect(b.props.open).toHaveBeenCalledWith(sid('hidden-session'))
+
+    rerender(b, {
+      useSessions: hook(sessionState(
+        [summary('hidden-session', 20), summary('shown-session', 10)],
+        { main: sid('shown-session') },
+      )),
+    })
+    expect(screen.queryByText('Hidden project')).toBeNull()
+    expect(screen.queryByText('hidden-session')).toBeNull()
+  })
+
+  it('drops the selected-Session exception while a global panel replaces the Conversation', () => {
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupExpanded('hidden-workspace', true)
+    const items = [workspace('hidden-workspace', ['hidden-session'], 'Hidden project', true)]
+    const b = mount({
+      useStore: bindSnapshotSelector(preferences),
+      actions: preferences.actions,
+      useSessions: hook(sessionState([summary('hidden-session', 20)], { main: sid('hidden-session') })),
+      useWorkspaces: hook(workspaceState(items)),
+    })
+    expect(screen.getByText('Hidden project')).toBeTruthy()
+
+    rerender(b, { usePanelInfo: selector => selector({ activePanelId: 'plugins' as MainPanelId }) })
+    expect(screen.queryByText('Hidden project')).toBeNull()
+  })
+
+  it('reveals hidden Workspaces from the header control and hides them again', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    const b = mount({
+      useStore: bindSnapshotSelector(preferences),
+      actions: preferences.actions,
+      useWorkspaces: hook(workspaceState([workspace('hidden-workspace', [], 'Hidden project', true)])),
+    })
+
+    expect(screen.queryByText('Hidden project')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '显示隐藏的工作区' }))
+    expect(preferences.getSnapshot().showHiddenWorkspaces).toBe(true)
+    expect(screen.getByText('Hidden project')).toBeTruthy()
+    expect(b.view.container.querySelector('[aria-pressed="true"]')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '隐藏隐藏的工作区' }))
+    expect(preferences.getSnapshot().showHiddenWorkspaces).toBe(false)
+    expect(screen.queryByText('Hidden project')).toBeNull()
+  })
+
+  it('keeps the reveal choice across a remount', () => {
+    localStorage.clear()
+    const items = [workspace('hidden-workspace', [], 'Hidden project', true)]
+    const first = mount({ useWorkspaces: hook(workspaceState(items)) })
+    fireEvent.click(screen.getByRole('button', { name: '显示隐藏的工作区' }))
+    expect(screen.getByText('Hidden project')).toBeTruthy()
+    first.view.unmount()
+
+    // A fresh instance rehydrates the persisted view state.
+    mount({ useWorkspaces: hook(workspaceState(items)) })
+    expect(screen.getByText('Hidden project')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '隐藏隐藏的工作区' })).toBeTruthy()
+  })
+
+  it('keeps the reveal control while the choice is on even with nothing hidden', () => {
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify({
+      groupBy: 'workspace',
+      orderBy: 'updated',
+      groupExpansion: {},
+      sessionOrderByAccount: {},
+      archivedFilter: 'default',
+      showHiddenWorkspaces: true,
+    }))
+    mount({ useWorkspaces: hook(workspaceState([workspace('shown', [], 'Shown')])) })
+    expect(screen.getByRole('button', { name: '隐藏隐藏的工作区' })).toBeTruthy()
+  })
+
+  it('reads a persisted view blob without the reveal choice as hidden', () => {
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify({
+      groupBy: 'workspace',
+      orderBy: 'updated',
+      groupExpansion: {},
+      sessionOrderByAccount: {},
+      archivedFilter: 'default',
+    }))
+    mount({ useWorkspaces: hook(workspaceState([workspace('hidden-workspace', [], 'Hidden project', true)])) })
+
+    expect(screen.queryByText('Hidden project')).toBeNull()
+    // The control still offers the way back despite the missing field.
+    expect(screen.getByRole('button', { name: '显示隐藏的工作区' })).toBeTruthy()
+  })
+
+  it('renders no reveal control while nothing is hidden or revealed', () => {
+    mount({ useWorkspaces: hook(workspaceState([workspace('shown', [], 'Shown')])) })
+    expect(screen.queryByRole('button', { name: '显示隐藏的工作区' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '隐藏隐藏的工作区' })).toBeNull()
+  })
+
+  it('keeps a hidden Workspace\'s saved order and expansion, and restores both when revealed', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupExpanded('hidden-workspace', true)
+    preferences.actions.setSessionOrder('hidden-workspace', ['b-after', 'a-before'], {})
+    mount({
+      useStore: bindSnapshotSelector(preferences),
+      actions: preferences.actions,
+      useSessions: hook(sessionState([summary('a-before', 20), summary('b-after', 10)])),
+      useWorkspaces: hook(workspaceState([
+        workspace('hidden-workspace', ['a-before', 'b-after'], 'Hidden project', true),
+      ])),
+    })
+
+    expect(preferences.getSnapshot().groupExpansion['hidden-workspace']).toBe(true)
+    expect(preferences.getSnapshot().sessionOrderByAccount['hidden-workspace']).toEqual(['b-after', 'a-before'])
+    expect(screen.queryByText('Hidden project')).toBeNull()
+
+    act(() => { preferences.actions.setShowHiddenWorkspaces(true) })
+    expect(rowLabels().map(label => label.includes('b-after') ? 'b-after' : 'a-before'))
+      .toEqual(['b-after', 'a-before'])
+  })
+
+  it('keeps only the selected row in the flat list', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupBy('flat')
+    mount({
+      useStore: bindSnapshotSelector(preferences),
+      actions: preferences.actions,
+      useSessions: hook(sessionState(
+        [summary('selected', 20), summary('sibling', 10), summary('loose', 5)],
+        { main: sid('selected') },
+      )),
+      useWorkspaces: hook(workspaceState([
+        workspace('hidden-workspace', ['selected', 'sibling'], 'Hidden project', true),
+      ])),
+    })
+
+    expect(rowLabels().map(label => label.includes('selected') ? 'selected' : 'loose'))
+      .toEqual(['selected', 'loose'])
   })
 })

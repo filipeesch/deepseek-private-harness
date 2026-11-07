@@ -4335,6 +4335,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace projection.',
       },
       {
+        signature: '@Remote(\'setHidden\') setHidden(request: WorkspaceSetHiddenRequest): Promise<WorkspaceValue>',
+        description: 'Mark one Workspace hidden from browsing surfaces, or show it again. The response arrives once the change is durable; an unknown identity fails as `workspace/not-found` without writing. The flag is presentation only: Sessions, files, directory, and every other verb are unaffected.',
+        parameters: [{ name: 'request', description: 'Workspace identity and the requested flag.' }],
+        returns: 'the updated Workspace projection.',
+      },
+      {
         signature: '@Remote(\'delete\') delete(request: WorkspaceDeleteRequest): Promise<WorkspaceDeleteValue>',
         description: 'Remove one Workspace registration while retaining files and Sessions.',
         parameters: [{ name: 'request', description: 'Workspace identity to remove.' }],
@@ -4428,9 +4434,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Durable workspace registry. Startup waits for `sessionPersistence`, builds one canonical-cwd header index, and completes the one-time history bootstrap before the service becomes active. The persistence dependency is mandatory so an unavailable peer can never be mistaken for an empty history and commit the initialized marker.',
     methods: [
       {
-        signature: 'async create(path: string, title?: string): Promise<Workspace>',
-        description: 'Create or reuse a workspace for an existing directory. The fully qualified path is canonicalized through `fs.realpath`; a relative, nonexistent, or non-directory path rejects. Repeated calls for the same canonical path return the existing entity without changing its title. A newly created workspace is prepended to the durable registry order. Different canonical paths may share a display title.',
-        parameters: [{ name: 'path', description: 'Existing directory to own, in a fully qualified path spelling.' }, { name: 'title', description: 'Display title used only when a new record is created.' }],
+        signature: 'async create(path: string, options: CreateWorkspaceOptions = {}): Promise<Workspace>',
+        description: 'Create or reuse a workspace for an existing directory. The fully qualified path is canonicalized through `fs.realpath`; a relative, nonexistent, or non-directory path rejects. Repeated calls for the same canonical path return the existing entity without changing its title or hidden flag. A newly created workspace is prepended to the durable registry order. Different canonical paths may share a display title.',
+        parameters: [{ name: 'path', description: 'Existing directory to own, in a fully qualified path spelling.' }, { name: 'options', description: 'Title and hidden flag used only when a new record is created.' }],
         returns: 'the existing or newly durable workspace.',
       },
       {
@@ -5873,6 +5879,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CreateTeamTaskRequest',
     declaration: 'export interface CreateTeamTaskRequest {\n    readonly subject: string;\n    readonly description: string;\n    readonly blockedBy?: readonly TeamTaskId[];\n    readonly writeScopes?: readonly string[];\n}',
+  },
+  {
+    name: 'CreateWorkspaceOptions',
+    declaration: 'export interface CreateWorkspaceOptions {\n    readonly title?: string;\n    readonly hidden?: boolean;\n}',
   },
   {
     name: 'CreateWorktreePhase',
@@ -9808,7 +9818,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'Workspace',
-    declaration: 'export interface Workspace {\n    readonly id: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly sessionIds: readonly SessionId[];\n    setTitle(title: string): Promise<void>;\n    attachSession(sessionId: SessionId): Promise<void>;\n    insertSessionBefore(sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>;\n    detachSession(sessionId: SessionId): Promise<void>;\n    status(): Promise<\'ok\' | \'missing-dir\'>;\n}',
+    declaration: 'export interface Workspace {\n    readonly id: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly hidden: boolean;\n    readonly sessionIds: readonly SessionId[];\n    setTitle(title: string): Promise<void>;\n    setHidden(hidden: boolean): Promise<void>;\n    attachSession(sessionId: SessionId): Promise<void>;\n    insertSessionBefore(sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>;\n    detachSession(sessionId: SessionId): Promise<void>;\n    status(): Promise<\'ok\' | \'missing-dir\'>;\n}',
   },
   {
     name: 'WorkspaceArchiveSessionRequest',
@@ -9840,7 +9850,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WorkspaceCreateRequest',
-    declaration: 'export interface WorkspaceCreateRequest {\n    readonly path: string;\n}',
+    declaration: 'export interface WorkspaceCreateRequest {\n    readonly path: string;\n    readonly hidden?: boolean;\n}',
   },
   {
     name: 'WorkspaceCreateValue',
@@ -9931,6 +9941,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WorkspaceRenameRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly title: string;\n}',
   },
   {
+    name: 'WorkspaceSetHiddenRequest',
+    declaration: 'export interface WorkspaceSetHiddenRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly hidden: boolean;\n}',
+  },
+  {
     name: 'WorkspaceUnarchiveSessionRequest',
     declaration: 'export interface WorkspaceUnarchiveSessionRequest {\n    readonly sessionId: SessionId;\n}',
   },
@@ -9944,7 +9958,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WorkspaceView',
-    declaration: 'export interface WorkspaceView {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly sessionIds: readonly SessionId[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+    declaration: 'export interface WorkspaceView {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly sessionIds: readonly SessionId[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly hidden: boolean;\n}',
   },
 ]
 

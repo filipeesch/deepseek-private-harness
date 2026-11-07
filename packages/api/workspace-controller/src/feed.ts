@@ -31,6 +31,7 @@ export function workspaceView(workspace: Workspace): WorkspaceView {
     sessionIds: [...workspace.sessionIds],
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
+    hidden: workspace.hidden,
   }
 }
 
@@ -43,6 +44,7 @@ function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceVie
     sessionIds: [...record.sessionIds],
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    hidden: record.hidden,
   }
 }
 

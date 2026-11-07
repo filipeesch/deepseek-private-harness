@@ -567,7 +567,7 @@ describe('workspaces', () => {
       await expect(runtime.workspaces.initializeDefault(signal)).resolves.toBeUndefined()
       const workspace = {
         workspaceId: 'default' as WorkspaceId, title: 'default-workspace', path: '/default', sessionIds: [],
-        createdAt: '2026-09-20T00:00:00Z', updatedAt: '2026-09-20T00:00:00Z',
+        createdAt: '2026-09-20T00:00:00Z', updatedAt: '2026-09-20T00:00:00Z', hidden: false,
       }
       const initialize = vi.fn(async () => workspace)
       runtime.workspaces.stub('initializeDefault', initialize)

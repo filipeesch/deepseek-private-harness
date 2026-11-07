@@ -25,6 +25,7 @@ import type {
   WorkspacePinSessionRequest,
   WorkspacePinValue,
   WorkspaceRenameRequest,
+  WorkspaceSetHiddenRequest,
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
@@ -39,7 +40,7 @@ export class WorkspaceCommands {
 
   /**
    * Create or resolve one Workspace over an existing directory.
-   * @param request - directory path to register.
+   * @param request - directory path to register and whether a new one starts hidden.
    * @returns the Workspace and whether this call created it.
    */
   create(request: WorkspaceCreateRequest): Promise<WorkspaceCreateValue> {
@@ -49,7 +50,10 @@ export class WorkspaceCommands {
         if (existing !== undefined) {
           return { workspace: workspaceView(existing), created: false }
         }
-        const workspace = await this.ctx.workspaceRegistry.create(request.path)
+        const workspace = await this.ctx.workspaceRegistry.create(
+          request.path,
+          { hidden: request.hidden === true },
+        )
         return { workspace: workspaceView(workspace), created: true }
       } catch (error) {
         if (remoteErrorOf(error) !== undefined) throw error
@@ -88,6 +92,20 @@ export class WorkspaceCommands {
       }
       return { workspace: workspaceView(workspace) }
     })
+  }
+
+  /**
+   * Mark one Workspace hidden from browsing surfaces, or show it again.
+   * @param request - Workspace identity and the requested flag.
+   * @returns the updated Workspace projection.
+   */
+  async setHidden(request: WorkspaceSetHiddenRequest): Promise<WorkspaceValue> {
+    const workspace = this.requireWorkspace(request.workspaceId)
+    // Always hand the request to the entity: its write slot decides whether the
+    // value already matches, while a snapshot read here would go stale against
+    // an overlapping write and drop the later request.
+    await workspace.setHidden(request.hidden)
+    return { workspace: workspaceView(workspace) }
   }
 
   /**

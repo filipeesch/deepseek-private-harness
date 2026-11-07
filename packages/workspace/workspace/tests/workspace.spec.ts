@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -16,6 +16,7 @@ import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-
 import WorkspaceRegistry, {
   WorkspaceId,
   type workspaceDomainState,
+  workspaceRecord,
   WorkspaceMoveInvalidError,
   WorkspaceOrderInvalidError,
 } from '../src/index.ts'
@@ -138,7 +139,13 @@ function selectiveFailureBackend(
   }
 }
 
-function record(path: string, sessionIds: string[], createdAt = '2026-07-24T00:00:00.000Z'): WorkspaceRecord {
+/**
+ * One raw stored record. Fixtures keep the `z.input` shape so a record written
+ * before a defaulted field existed keeps proving the schema default.
+ */
+type StoredRecord = z.input<typeof workspaceRecord>
+
+function record(path: string, sessionIds: string[], createdAt = '2026-07-24T00:00:00.000Z'): StoredRecord {
   return {
     path,
     title: basename(path),
@@ -156,7 +163,7 @@ function record(path: string, sessionIds: string[], createdAt = '2026-07-24T00:0
 type StoredDomainState = z.input<typeof workspaceDomainState>
 
 function storedPool(
-  entries: Array<[string, WorkspaceRecord]>,
+  entries: Array<[string, StoredRecord]>,
   state: StoredDomainState,
 ): MemoryMediaPool {
   const pool = new MemoryMediaPool()
@@ -330,12 +337,23 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     expect(result.registry.list().some(workspace => workspace.path === drifted)).toBe(false)
   })
 
+  it('reads a workspace record written before the hidden flag existed as visible', async () => {
+    const dir = await makeDir('legacy-visibility')
+    const legacyId = WorkspaceId('00000000-0000-4000-8000-000000000012')
+    const pool = storedPool(
+      [[legacyId, record(dir, [])]],
+      { initialized: true, workspaceIds: [legacyId] },
+    )
+    const result = await harness({ pool })
+    expect(result.registry.get(legacyId)?.hidden).toBe(false)
+  })
+
   it('orders headerless partial records by prior order, then stable id', async () => {
     const first = await makeDir('fallback-first')
     const second = await makeDir('fallback-second')
     const firstId = WorkspaceId('00000000-0000-4000-8000-000000000020')
     const secondId = WorkspaceId('00000000-0000-4000-8000-000000000021')
-    const entries: Array<[string, WorkspaceRecord]> = [
+    const entries: Array<[string, StoredRecord]> = [
       [secondId, record(second, [], '2026-07-24T00:00:00.000Z')],
       [firstId, record(first, [], '2026-07-24T00:00:00.000Z')],
     ]
@@ -386,9 +404,9 @@ describe('WorkspaceRegistry create and lookup', () => {
     const alias = join(base, 'first-link')
     await symlink(firstDir, alias)
     const { registry, pool } = await harness()
-    const first = await registry.create(firstDir, 'Original')
+    const first = await registry.create(firstDir, { title: 'Original' })
     const second = await registry.create(secondDir)
-    const reused = await registry.create(alias, 'Ignored')
+    const reused = await registry.create(alias, { title: 'Ignored' })
     expect(reused).toBe(first)
     expect(first.title).toBe('Original')
     expect(registry.list()).toEqual([second, first])
@@ -397,12 +415,33 @@ describe('WorkspaceRegistry create and lookup', () => {
     expect(await registry.resolveByPath(await makeDir('unowned'))).toBeUndefined()
   })
 
+  it('creates a hidden workspace and leaves an existing record flag untouched', async () => {
+    const visibleDir = await makeDir('visible-created')
+    const hiddenDir = await makeDir('hidden-created')
+    const alias = join(base, 'hidden-created-link')
+    await symlink(hiddenDir, alias)
+    const { registry, pool } = await harness()
+
+    const visible = await registry.create(visibleDir)
+    const hidden = await registry.create(hiddenDir, { hidden: true })
+    expect(visible.hidden).toBe(false)
+    expect(hidden.hidden).toBe(true)
+    expect(storedRecord(pool, hidden.id).hidden).toBe(true)
+
+    // Creating through an alias of the hidden directory resolves the record and
+    // leaves its flag alone.
+    const reused = await registry.create(alias)
+    expect(reused).toBe(hidden)
+    expect(reused.hidden).toBe(true)
+    expect(storedRecord(pool, hidden.id).hidden).toBe(true)
+  })
+
   it('serializes concurrent same-path creates into one entity', async () => {
     const dir = await makeDir('concurrent')
     const { registry, pool } = await harness()
     const [left, right] = await Promise.all([
-      registry.create(dir, 'Winner'),
-      registry.create(dir, 'Loser'),
+      registry.create(dir, { title: 'Winner' }),
+      registry.create(dir, { title: 'Loser' }),
     ])
     expect(left).toBe(right)
     expect(registry.list()).toEqual([left])
@@ -413,8 +452,8 @@ describe('WorkspaceRegistry create and lookup', () => {
     const firstDir = await makeDir('named-first')
     const secondDir = await makeDir('named-second')
     const { registry } = await harness()
-    const first = await registry.create(firstDir, 'Shared')
-    const second = await registry.create(secondDir, 'Shared')
+    const first = await registry.create(firstDir, { title: 'Shared' })
+    const second = await registry.create(secondDir, { title: 'Shared' })
     expect(first.title).toBe('Shared')
     expect(second.title).toBe('Shared')
     expect(registry.list()).toEqual([second, first])
@@ -1039,6 +1078,108 @@ describe('workspace mutation and status', () => {
     result.pool.failNextWrites = 1
     await expect(workspace.setTitle('lost')).rejects.toThrow(/injected/)
     expect(workspace.title).toBe('kept')
+  })
+
+  it('persists the hidden flag, skips an unchanged value, and restores it after a restart', async () => {
+    const dir = await makeDir('hidden-flag')
+    const result = await harness()
+    const workspace = await result.registry.create(dir)
+    expect(workspace.hidden).toBe(false)
+    const createdUpdatedAt = workspace.updatedAt
+
+    // Setting the value it already has resolves without a durable write.
+    await workspace.setHidden(false)
+    expect(workspace.updatedAt).toBe(createdUpdatedAt)
+    expect(storedRecord(result.pool, workspace.id).hidden).toBe(false)
+
+    await workspace.setHidden(true)
+    expect(workspace.hidden).toBe(true)
+    expect(storedRecord(result.pool, workspace.id).hidden).toBe(true)
+    expect(Date.parse(workspace.updatedAt)).toBeGreaterThanOrEqual(Date.parse(createdUpdatedAt))
+
+    await result.fiber.dispose()
+    const restarted = await harness({ pool: result.pool })
+    expect(restarted.registry.get(workspace.id)?.hidden).toBe(true)
+  })
+
+  it('stamps a strictly later instant for two mutations in the same millisecond', async () => {
+    const dir = await makeDir('monotonic')
+    const result = await harness()
+    const workspace = await result.registry.create(dir)
+    const created = workspace.updatedAt
+    vi.useFakeTimers({ now: new Date(created) })
+    onTestFinished(() => { vi.useRealTimers() })
+
+    await workspace.setTitle('first')
+    const titled = workspace.updatedAt
+    await workspace.setHidden(true)
+    const hidden = workspace.updatedAt
+
+    expect(Date.parse(titled)).toBeGreaterThan(Date.parse(created))
+    expect(Date.parse(hidden)).toBeGreaterThan(Date.parse(titled))
+    expect(storedRecord(result.pool, workspace.id).updatedAt).toBe(hidden)
+  })
+
+  it('stamps a usable instant when the stored record carried an unparsable one', async () => {
+    const dir = await makeDir('corrupt-instant')
+    const id = WorkspaceId('00000000-0000-4000-8000-000000000030')
+    const pool = storedPool(
+      [[id, { ...record(dir, []), updatedAt: 'not-an-instant' }]],
+      { initialized: true, workspaceIds: [id] },
+    )
+    const result = await harness({ pool })
+    const workspace = result.registry.get(id)!
+    await workspace.setHidden(true)
+    expect(Number.isNaN(Date.parse(workspace.updatedAt))).toBe(false)
+  })
+
+  it('stays fully operable while hidden and writes only the record', async () => {
+    const dir = await makeDir('hidden-operable')
+    const result = await harness({ sessions: [header('before', dir, 100)] })
+    const workspace = result.registry.list()[0]!
+    const before = storedRecord(result.pool, workspace.id)
+
+    await workspace.setHidden(true)
+    await workspace.setTitle('renamed while hidden')
+    result.setSessions([header('before', dir, 100), header('after', dir, 200)])
+    await workspace.attachSession(SessionId('after'))
+
+    expect(workspace.hidden).toBe(true)
+    expect(workspace.title).toBe('renamed while hidden')
+    expect(workspace.sessionIds).toEqual(['after', 'before'])
+    expect((await stat(dir)).isDirectory()).toBe(true)
+
+    const after = storedRecord(result.pool, workspace.id)
+    expect(after.updatedAt).not.toBe(before.updatedAt)
+    // Only the record moved: path, createdAt, and the rest of the row survive.
+    expect({ ...after, updatedAt: before.updatedAt }).toEqual({
+      ...before,
+      title: 'renamed while hidden',
+      sessionIds: [SessionId('after'), SessionId('before')],
+      hidden: true,
+    })
+  })
+
+  it('leaves the directory and a stored Session log byte-identical across hide and reveal', async () => {
+    // A durable Session log stands in for the Host-owned store this package
+    // never opens; both trees are compared byte for byte around the toggles.
+    const dir = await makeDir('hidden-bytes')
+    const logRoot = await makeDir('hidden-logs')
+    const sentinel = join(dir, 'notes.txt')
+    const log = join(logRoot, 'session.jsonl')
+    await writeFile(sentinel, 'workspace file bytes\n')
+    await writeFile(log, '{"type":"header"}\n{"type":"message"}\n')
+    const result = await harness({ sessions: [header('logged', dir, 100)] })
+    const workspace = result.registry.list()[0]!
+
+    await workspace.setHidden(true)
+    await workspace.setHidden(false)
+
+    expect(await readFile(sentinel, 'utf8')).toBe('workspace file bytes\n')
+    expect(await readFile(log, 'utf8')).toBe('{"type":"header"}\n{"type":"message"}\n')
+    // Nothing appeared beside them either: hiding writes only the domain record.
+    expect(await readdir(dir)).toEqual(['notes.txt'])
+    expect(await readdir(logRoot)).toEqual(['session.jsonl'])
   })
 
   it('reports directory disappearance without mutating the workspace', async () => {

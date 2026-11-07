@@ -105,7 +105,7 @@ describe('web e2e: sidebar search alignment and row action targets', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd, workspaceTitle)
+    const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd, { title: workspaceTitle })
     const id = await seedSession(scaffold, await readFile(SEED, 'utf8'), 'sidebar-action-geometry')
     await workspace.attachSession(id)
     await scaffold.ctx.sessionController.rename({ sessionId: id, title: sessionTitle })
@@ -177,6 +177,56 @@ describe('web e2e: sidebar search alignment and row action targets', () => {
     }
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
+  })
+
+  it('keeps Search, reveal, View options, and Add workspace reachable while a Workspace is hidden', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-sidebar-reveal-actions'))
+    const hiddenDir = await mkdtemp(join(tmpdir(), 'dsh-sidebar-hidden-'))
+    try {
+      const hidden = await scaffold.ctx.workspaceRegistry.create(hiddenDir, {
+        title: 'Hidden geometry workspace', hidden: true,
+      })
+      try {
+        await page.getByRole('button', { name: 'Show hidden workspaces', exact: true })
+          .waitFor({ timeout: 10_000 })
+        // Stable across the label change: the control is the header's pressed toggle.
+        const reveal = page.locator('[data-sidebar-workspace-header] button[aria-pressed]')
+        const reference = page.locator('button[class*="newSession"]')
+        const addControl = page.getByRole('button', { name: 'Add workspace', exact: true })
+        const controls = [
+          page.getByRole('button', { name: 'Search sessions', exact: true }),
+          reveal,
+          page.getByRole('button', { name: 'View options', exact: true }),
+          addControl,
+        ]
+        // The cluster grows one 32px slot to the left; Add keeps its place.
+        await expect.poll(async () => {
+          const anchor = await reference.boundingBox()
+          if (anchor === null) throw new Error('New session has no layout box')
+          const boxes = await Promise.all(controls.map(control => control.boundingBox()))
+          return boxes.map(box => box === null ? null : Math.round(box.x + box.width - anchor.x - anchor.width))
+        }, { timeout: 10_000 }).toEqual([-93, -61, -29, 3])
+        // The control that a 60px cap would clip answers a hit test at its center.
+        const add = await addControl.boundingBox()
+        if (add === null) throw new Error('Add workspace has no layout box')
+        expect(await page.evaluate(({ x, y }) => {
+          const target = document.elementFromPoint(x, y)
+          const button = [...document.querySelectorAll('button')]
+            .find(candidate => candidate.getAttribute('aria-label') === 'Add workspace')
+          return target !== null && button !== undefined && button.contains(target)
+        }, { x: add.x + add.width / 2, y: add.y + add.height / 2 })).toBe(true)
+
+        await reveal.click()
+        const revealed = page.getByRole('button', { name: 'Hide hidden workspaces', exact: true })
+        await expect.poll(() => revealed.getAttribute('aria-pressed')).toBe('true')
+        await page.getByText('Hidden geometry workspace', { exact: true }).waitFor({ timeout: 10_000 })
+        expect(tripwire.pageErrors).toEqual([])
+      } finally {
+        await scaffold.ctx.workspaceRegistry.delete(hidden.id)
+      }
+    } finally {
+      await rm(hiddenDir, { recursive: true, force: true })
+    }
   })
 
   it.each(['Search sessions', 'View options', 'Add workspace'])('keeps the %s tooltip visible across its full bounds', async (name) => {
@@ -410,7 +460,7 @@ describe('web e2e: sidebar search alignment and row action targets', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-sidebar-first-workspace-drop'))
     const directory = await mkdtemp(join(tmpdir(), 'dsh-sidebar-drag-'))
     try {
-      const extra = await scaffold.ctx.workspaceRegistry.create(directory, 'Sidebar drag workspace')
+      const extra = await scaffold.ctx.workspaceRegistry.create(directory, { title: 'Sidebar drag workspace' })
       try {
         const rows = page.locator('[role="tree"][aria-label="Sessions"] [data-row-key^="workspace:"]')
         await expect.poll(() => rows.count()).toBe(2)
