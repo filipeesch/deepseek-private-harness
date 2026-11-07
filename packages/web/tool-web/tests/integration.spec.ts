@@ -54,7 +54,7 @@ beforeEach(async () => {
   })
   await ctx.plugin(WebFetchLocal, {})
   ctx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot([{ source: 'process', values: { DEEPSEEK_API_KEY: 'search-key' } }]))
-  await ctx.plugin(WebDeepSeekApi, { searchBaseURL: SEARCH_API_BASE, sendOriginalQuestion: false })
+  await ctx.plugin(WebDeepSeekApi, { searchBaseURL: SEARCH_API_BASE })
   // The shipped deployment shape: the tool-call budget is declared by tool-web
   // config (default 30s, attached as ToolDefinition.timeoutMs) and enforced by
   // the zero-config timeout-policy plugin, set above the provider backstop so the

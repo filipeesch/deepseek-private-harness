@@ -27,7 +27,6 @@ import {
 import {
   plainOptions as plainOfficialOptions, resolveAdapterOptions as resolveOfficialOptions, type Config as OfficialRouteConfig,
 } from '@deepseek-ai/dsh-llm-deepseek-api-key'
-import type { Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-web'
 import { DeepSeekFetchApiProvider } from './fetch.ts'
 import {
@@ -64,8 +63,6 @@ export interface Config {
    * share the account limit without coordination. Defaults to 5.
    */
   searchRequestsPerSecond: Volatile<number>
-  /** Send the triggering user question, bounded to 128 characters, as `ori_question`. Defaults to true. */
-  sendOriginalQuestion: Volatile<boolean>
   /**
    * Own Search API base including its path prefix; `/search` is appended. With only {@link searchApiKeyEnv} set, the
    * official base applies.
@@ -85,7 +82,6 @@ export interface Config {
 export const Config = z.object({
   count: z.number().step(1).min(1).max(50).default(DEEPSEEK_DEFAULT_COUNT).volatile(),
   searchRequestsPerSecond: z.number().step(1).min(1).default(DEEPSEEK_SEARCH_REQUESTS_PER_SECOND).volatile(),
-  sendOriginalQuestion: z.boolean().default(true).volatile(),
   searchBaseURL: z.string().volatile(),
   searchApiKeyEnv: z.string().role('credential-ref').volatile(),
   fetchBaseURL: z.string().volatile(),
@@ -140,18 +136,6 @@ const CAPABILITY = {
 } as const satisfies Record<Capability, { subject: DeepSeekWebGuidance['subject']; prefix: string }>
 
 /**
- * Read the text of the latest human prompt, the question that triggered the
- * current turn. Injected user-role context carries another source kind.
- * @param session - the initiating Session, when the search runs inside one.
- * @returns the prompt's joined text blocks, or undefined without a prompt.
- */
-function latestUserQuestion(session: Session | undefined): string | undefined {
-  const prompt = session?.deriveMessages().findLast(message => message.role === 'user' && message.source.kind === 'user')
-  if (prompt === undefined) return undefined
-  return prompt.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n')
-}
-
-/**
  * Register the Search API and Fetch API providers over one live settings section. Each operation reads one settings
  * snapshot and the route of the initiating Session's latest model request; each `ready()` call reads one settings
  * snapshot and the route of the model request being prepared. Both resolve the same plan.
@@ -174,9 +158,6 @@ export function apply(ctx: Context, config: Config): void {
     ...target('search'),
     count: config.count.get(),
     requestsPerSecond: config.searchRequestsPerSecond.get(),
-    ...config.sendOriginalQuestion.get() ? {
-      originalQuestion: () => latestUserQuestion(ctx.get('agents')?.currentInitiator()?.session),
-    } : {},
   }))
   const fetchApi = new DeepSeekFetchApiProvider(() => target('fetch'))
   ctx.web.registerSearchProvider({
