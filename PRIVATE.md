@@ -1,6 +1,6 @@
 # Private distribution policy
 
-`filipeesch/deepseek-private-harness` tracks `deepseek-ai/deepseek-harness` (remote `upstream`) and stays in sync with it, with one invariant on top: **the application sends nothing to external parties except the model, search, and plugin requests the user configures.** No telemetry, analytics, feedback upload, usage identifiers, Session-log upload, account Sign In, or developer-controlled remote policy.
+`filipeesch/dsh-private` tracks `deepseek-ai/deepseek-harness` (remote `upstream`) and stays in sync with it, with one invariant on top: **the application sends nothing to external parties except the model, search, and plugin requests the user configures.** No telemetry, analytics, feedback upload, usage identifiers, Session-log upload, account Sign In, or developer-controlled remote policy.
 
 This file is for maintainers: it records what upstream changes to drop or keep during a sync. Usage and update instructions for users are in [README.md](README.md#private-distribution).
 

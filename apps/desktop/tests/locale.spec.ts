@@ -42,6 +42,27 @@ describe('desktop locale dictionaries', () => {
       .toBe('plugin@1.2.3 {missing}')
   })
 
+  it.each([
+    ['en', en], ['zh', zh], ['ja', ja], ['es', es], ['fr', fr], ['de', de], ['ru', ru], ['pt', pt],
+  ] as const)('keeps %s brand texts private and application identity unchanged', (_id, messages) => {
+    // Brand texts describe the product; identity strings name the installed
+    // application, whose bundle keeps the upstream name.
+    expect(messages.aboutProduct).toBe('DSH Private')
+    expect(messages.welcomeTitle).toBe('DSH Private')
+    expect(messages.welcomeBrand).toBe('DSH Private')
+    expect(messages.updateTitle).toContain('DSH Private')
+    expect(messages.startupFailed).toContain('DSH Private')
+    expect(messages.updateTitle).not.toContain('DeepSeek Harness')
+    expect(messages.startupFailed).not.toContain('DeepSeek Harness')
+    for (const identity of [
+      messages.aboutMenu, messages.hideApplication, messages.quitApplication,
+      messages.openApplication, messages.quitTitle,
+    ]) {
+      expect(identity).toContain('DeepSeek Harness')
+      expect(identity).not.toContain('DSH Private')
+    }
+  })
+
   it('prefers an explicit supported choice, then the first supported system language', () => {
     expect(resolveDesktopStartupLocale('zh', ['en-US']).id).toBe('zh-CN')
     expect(resolveDesktopStartupLocale('EN', ['zh-CN']).id).toBe('en')

@@ -145,6 +145,7 @@ describe('client build environment', () => {
     expect(local).toEqual({
       DSH_CLIENT_BUILD_PROFILE: 'local',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_TITLE: 'DSH Private',
       DSH_CLIENT_VERSION: '1.2.3',
       ...(dirty === 'true' ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
     })
@@ -177,8 +178,10 @@ describe('client build environment', () => {
       DSH_CLIENT_GIT_DIRTY: 'true',
       DSH_CLIENT_VERSION: 'spoofed',
     })).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'local',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
       DSH_CLIENT_EXTRA: 'preserved',
+      DSH_CLIENT_TITLE: 'DSH Private',
       DSH_CLIENT_VERSION: '1.2.3-rc.4',
     })
     expect(officialClientBuildEnvironment(fixtureRoot)).toEqual({
@@ -211,8 +214,10 @@ describe('client build environment', () => {
     expect(repositoryClientBuildEnvironment(fixtureRoot, {
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH,
     })).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'local',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
       DSH_CLIENT_GIT_DIRTY: 'true',
+      DSH_CLIENT_TITLE: 'DSH Private',
       DSH_CLIENT_VERSION: '1.2.3-rc.4',
     })
 
@@ -235,7 +240,9 @@ describe('client build environment', () => {
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH,
       DSH_CLIENT_GIT_DIRTY: 'true',
     })).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'local',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_TITLE: 'DSH Private',
       DSH_CLIENT_VERSION: '2.0.0',
     })
   })
