@@ -12,8 +12,13 @@ Keep these removed. Upstream changes to them are dropped during merges.
 - Web-search `ori_question` (prompt excerpt sent with searches).
 - DeepSeek account Sign In: `deepseek-account`, `deepseek-account-platform`, `llm-deepseek-account`, `account-controller`, `ui-settings-account`, Desktop Welcome sign-in and Platform view, the Feishu contact form.
 - Desktop mandatory-update policy and the `download.deepseek.com` update feed.
+- Upstream CI and governance in `.github`: every upstream workflow except `private-desktop-release.yml`, the review-ownership and issue-management policies, `dependabot.yml`, issue templates, and the specs and gates that only policed them. Upstream CI needs DeepSeek runners, secrets, and GitHub App credentials; Dependabot PRs would fight upstream syncs; Issues are disabled.
 
 DeepSeek remains an API-key model provider, never the default model or default search provider. Feedback stays local. Desktop updates come only from this repository's GitHub Releases (Windows x64 today; Linux once Desktop packaging supports it; no macOS builds) through the `private-desktop-release.yml` workflow; a push to `master` that carries a Desktop version without a `v<version>` tag publishes that version.
+
+## CI
+
+`.github/workflows/private-ci.yml` runs on GitHub-hosted runners without secrets for pull requests to `master` and pushes to `master`. Its final job, **`private-ci passed`**, is the required merge check: it needs every other job and fails when any of them failed, was cancelled, or was skipped. Mark exactly that name as required in branch protection or the ruleset. Instrumented coverage, benchmarks, Python SDK runtime, and macOS builds are not ported; unit tests run uninstrumented in four shards.
 
 ## Syncing with upstream
 
@@ -36,6 +41,9 @@ Take everything by default — features, fixes, refactors, docs, tests — excep
 4. **Changed defaults** for model provider, search provider, or update feed: keep the private defaults.
 5. **Unclear whether a change sends data out:** treat it as outbound until the code proves otherwise.
 6. **Persisted Session events** whose producer was removed (`feedback/*`, `session-log-deepseek/delivery-accepted`, events naming the `deepseek-account` provider): keep reader support; old sessions must still load ([format rules](docs/session-format-status.md)).
+7. **Upstream changes to deleted `.github` files** (workflows, policies, templates, `dependabot.yml`): drop them and keep the deletion.
+8. **New upstream workflow:** delete it in the merge commit unless it runs on GitHub-hosted runners without DeepSeek secrets; then port its useful checks into `private-ci.yml` and add any new job to `private-ci passed`'s `needs`.
+9. **Upstream gate or spec that reads a deleted workflow:** delete it with the workflow rather than editing it.
 
 ## Post-merge audit
 
