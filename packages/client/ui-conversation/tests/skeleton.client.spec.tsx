@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { contextMenuHook } from '@deepseek-ai/dsh-client-test-runtime'
-import type { GlobalStandardProps, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { GlobalStandardProps, ScopeStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createContext, useContext, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
@@ -23,7 +23,8 @@ import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { ConversationContent } from '../src/client/skeleton/ConversationContent.tsx'
 import { ConversationHeader } from '../src/client/skeleton/ConversationHeader.tsx'
-import { ConversationMainPanel } from '../src/client/skeleton/ConversationMainPanel.tsx'
+import { ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
+import { ConversationWindow } from '../src/client/skeleton/ConversationWindow.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { conversationPhase } from '../src/client/contract/snapshot.ts'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
@@ -32,8 +33,9 @@ import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps, ConversationContentInputProps, ConversationContentProps,
-  ConversationHeaderLineageOwnerProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps, ConversationSlotProps,
-  ConversationViewActionsOwnerProps, ConversationViewsProps, HeroFrameOwnerProps,
+  ConversationHeaderLineageOwnerProps, ConversationHeaderOwnerProps, ConversationSessionHeaderSlotProps,
+  ConversationSessionSlotProps, ConversationSlotProps, ConversationViewActionsOwnerProps,
+  ConversationViewsProps, ConversationWindowInputProps, ConversationWindowProps, HeroFrameOwnerProps,
 } from '../src/client/contract/slots.ts'
 import type { ViewTab } from '../src/client/contract/views.ts'
 
@@ -99,6 +101,14 @@ const t: ConversationContentProps['t'] = makeTranslate(zh, commonZh)
 const sid = (id: string) => id as SessionId
 const wid = (id: string) => id as WorkspaceId
 const SID = sid('s1')
+/** A second ordinary Session, used to prove an occurrence follows its render position. */
+const SID2 = sid('s2')
+
+/**
+ * Standard inputs one window occurrence receives: the Session-maybe kit plus
+ * the Session area seat a declaring entry gets.
+ */
+type WindowRuntime = ScopeStandardProps<'session-maybe'> & Pick<ConversationWindowProps, 'SessionProvider'>
 
 type SessionSlotProps = ConversationSessionSlotProps
 
@@ -147,6 +157,14 @@ function mount(
     entryActions?: boolean
     /** Isolate header capability checks from the composer's required layout observers. */
     headerOnly?: boolean
+    /** Render the window as an embedded occurrence instead of the resident seat. */
+    windowVariant?: 'main' | 'embedded'
+    /** Render the resident seat and an embedded occurrence of the same window side by side. */
+    withEmbedded?: boolean
+    /** Withhold the assembled Conversation while a Session is bound. */
+    conversationAbsent?: boolean
+    /** Render the body-only composition, without the window or its chrome. */
+    bodyOnly?: boolean
   } = {},
 ) {
   const sessionId = 'sessionId' in options ? options.sessionId : SID
@@ -162,23 +180,28 @@ function mount(
     cwd: '/projects/one', running: false, retainedBy: { mainView: 1 }, blank: options.summaryBlank ?? false, updatedAt: 3,
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
   }
+  /** A second ordinary Session the same mount can move its window onto. */
+  const otherRow = {
+    id: SID2, displayTitle: 'Second', cwd: '/projects/two',
+    running: false, retainedBy: {}, blank: false, updatedAt: 4,
+  }
   const listed = options.omitSummaryRow !== true
   const sessions = createSnapshotStore<SessionListState>({
     ids: listed
-      ? [root, ...options.nestedSubagent === true ? [parent] : [], SID]
-      : [root],
+      ? [root, ...options.nestedSubagent === true ? [parent] : [], SID, SID2]
+      : [root, SID2],
     byId: {
       [root]: rootRow,
       ...listed && options.nestedSubagent === true && { [parent]: parentRow },
       ...listed && { [SID]: childRow },
+      [SID2]: otherRow,
     },
     phase: 'ready', projectionsBySession: {},
   })
   const workspaces = createSnapshotStore<WorkspaceSnapshot>(workspaceState(workspaceRows))
   const session = createSnapshotStore<SessionSnapshot>(snapshot)
-  const useSession = bindSnapshotSelector(session)
+  const otherSession = createSnapshotStore<SessionSnapshot>(sessionSnapshotOf())
   const conversation = createSnapshotStore<ConversationSnapshot>(EMPTY_CONVERSATION_SNAPSHOT)
-  const useConversation = bindSnapshotSelector(conversation)
   const useSessionStatus = bindSnapshotSelector(
     createSnapshotStore<SessionStatusSnapshot>(new Map()),
   )
@@ -186,24 +209,65 @@ function mount(
   store.actions.setDraft('ordinary draft')
   const { wiring, sink } = fakeWiring()
   wiring.setDraft(store.store.getSnapshot().draft)
-  const useInput = bindSnapshotSelector(wiring.state)
+  const useInput: SessionSlotProps['useInput'] = bindSnapshotSelector(wiring.state)
   const inputActions = wiring.actions
   const stop = vi.fn()
   const open = vi.fn()
   const slotCalls: string[] = []
   const headerFactory = vi.fn<ConversationSessionHeaderSlotProps['renderFactorySlot']>(() => null)
   const lineageOwners: ConversationHeaderLineageOwnerProps[] = []
-  const viewTabs = options.viewTabs ?? [
+  // The roster publishes a fresh array, as its production source does; a test
+  // that changes it must publish rather than mutate in place, or the header's
+  // memo would keep the previous snapshot.
+  const roster = createSnapshotStore<readonly ViewTab[]>(options.viewTabs ?? [
     { id: 'chat', label: 'Chat' },
     { id: 'trajectory', label: 'Trajectory' },
-  ]
-  const useConversationViews: SessionSlotProps['useConversationViews'] = selector => selector(viewTabs)
+  ])
+  const useConversationViews: SessionSlotProps['useConversationViews'] = bindSnapshotSelector(roster)
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []
   let pickerOwner: unknown
   const frameOwners: HeroFrameOwnerProps[] = []
   let actionsOwner: ConversationViewActionsOwnerProps | undefined
-  const setPinned = vi.fn<(id: string, pinned: boolean) => void>()
+  // The pin list is a real source: a More-menu change must reach every
+  // occurrence's tab row, not just the spy.
+  const unpinned = createSnapshotStore<readonly string[]>(options.unpinnedViews ?? [])
+  const useEntryPinsHook = bindSnapshotSelector(unpinned)
+  const setPinned = vi.fn((id: string, pinned: boolean) => {
+    const current = unpinned.getSnapshot()
+    if (id === 'chat' || pinned !== current.includes(id)) return
+    unpinned.set(pinned ? current.filter(entry => entry !== id) : [...current, id])
+  })
+  /**
+   * The Session area this mount renders in. Cases move it with `bind` to prove
+   * an occurrence follows its render position rather than a global selection.
+   */
+  const binding: { sessionId: SessionId | undefined; session: typeof session } = {
+    sessionId,
+    session,
+  }
+  const boundSessionId = (): SessionId => {
+    if (binding.sessionId === undefined) throw new Error('mount: no Session is bound')
+    return binding.sessionId
+  }
+  // Bound per store so the components under test keep their real
+  // subscriptions: a publication must repaint them, and only an unrelated one
+  // may leave the composer seats untouched.
+  const sessionHooks = bindSnapshotSelector(session)
+  const otherSessionHooks = bindSnapshotSelector(otherSession)
+  const conversationHooks = bindSnapshotSelector(conversation)
+  const useSessionStrict: SessionSlotProps['useSession'] = selector =>
+    (binding.session === otherSession ? otherSessionHooks : sessionHooks)(selector)
+  const useConversationStrict: SessionSlotProps['useConversation'] = selector => conversationHooks(selector)
+  const useSessions: SessionSlotProps['useSessions'] = bindSnapshotSelector(sessions)
+  const useSessionMaybe: WindowRuntime['useSession'] = selector =>
+    binding.sessionId === undefined ? undefined : useSessionStrict(selector)
+  const useConversationMaybe: WindowRuntime['useConversation'] = selector =>
+    binding.sessionId === undefined || options.conversationAbsent === true
+      ? undefined
+      : useConversationStrict(selector)
+  const usePanelInfo: SessionSlotProps['usePanelInfo'] = selector => selector({ activePanelId: null })
+  const useWorkspaces = bindSnapshotSelector(workspaces)
   const renderSlot = ((key: string, owner: object, opts?: { only?: string; fallback?: ReactNode; children?: ReactNode }) => {
     slotCalls.push(key)
     if (key === 'conversation.input.model' || key === 'conversation.input.plan') {
@@ -224,28 +288,48 @@ function mount(
       return opts?.fallback ?? null
     }
     if (key === 'conversation.header') {
-      return <ConversationHeader {...runtimeProps} renderSlot={renderSlot as never} />
+      return (
+        <ConversationHeader
+          {...(owner as ConversationHeaderOwnerProps)}
+          sessionId={binding.sessionId}
+          SessionProvider={({ children }) => children}
+          useSession={useSessionMaybe}
+          useConversation={useConversationMaybe}
+          useSessions={useSessions}
+          useSessionStatus={useSessionStatus}
+          useSessionRetainInfo={() => undefined}
+          useContextMenu={contextMenuHook()}
+          useResource={useResource}
+          usePanelInfo={usePanelInfo}
+          useWorkspaces={useWorkspaces}
+          {...allowAllAccess}
+          useProjection={(() => undefined)}
+          useInput={useInput}
+          inputActions={inputActions}
+          renderSlot={renderSlot as never}
+        />
+      )
     }
     if (key === 'conversation.session.header') {
       return (
         <ConversationSessionHeader
           hideChrome={(owner as Pick<ConversationSessionHeaderSlotProps, 'hideChrome'>).hideChrome}
-          sessionId={SID}
+          sessionId={boundSessionId()}
           SessionProvider={({ children }) => children}
-          useSession={useSession}
-          useConversation={useConversation}
+          useSession={useSessionStrict}
+          useConversation={useConversationStrict}
           useConversationViews={useConversationViews}
-          useEntryPins={selector => selector(options.unpinnedViews ?? [])}
+          useEntryPins={useEntryPinsHook}
           useEntryActions={selector => selector(options.entryActions ?? false)}
           setPinned={setPinned}
           useChat={useChat}
           useTrajectory={useTrajectory}
-          useSessions={props.useSessions}
-          usePanelInfo={props.usePanelInfo}
+          useSessions={useSessions}
+          usePanelInfo={usePanelInfo}
           useContextMenu={contextMenuHook()} useResource={useResource}
           useSessionStatus={useSessionStatus}
           useSessionRetainInfo={() => undefined}
-          useWorkspaces={props.useWorkspaces}
+          useWorkspaces={useWorkspaces}
           {...allowAllAccess}
           useProjection={(() => undefined)}
           useInput={useInput}
@@ -263,20 +347,20 @@ function mount(
     if (key === 'conversation.session') {
       return (
         <ConversationSession
-          sessionId={SID}
+          sessionId={boundSessionId()}
           SessionProvider={({ children }) => children}
-          useSession={useSession}
-          useConversation={useConversation}
+          useSession={useSessionStrict}
+          useConversation={useConversationStrict}
           useConversationViews={useConversationViews}
           useInspectCall={selector => selector(undefined)}
           useChat={useChat}
           useTrajectory={useTrajectory}
-          useSessions={props.useSessions}
-          usePanelInfo={props.usePanelInfo}
+          useSessions={useSessions}
+          usePanelInfo={usePanelInfo}
           useContextMenu={contextMenuHook()} useResource={useResource}
           useSessionStatus={useSessionStatus}
           useSessionRetainInfo={() => undefined}
-          useWorkspaces={props.useWorkspaces}
+          useWorkspaces={useWorkspaces}
           {...allowAllAccess}
           useProjection={(() => undefined)}
           useInput={useInput}
@@ -295,20 +379,20 @@ function mount(
       const bar = owner as ComposerBarOwnerProps
       return (
         <InputBar
-          sessionId={SID}
+          sessionId={binding.sessionId}
           SessionProvider={({ children }) => children}
           useContextMenu={contextMenuHook()} useResource={useResource}
-          useSession={useSession}
-          useConversation={useConversation}
-          useSessions={props.useSessions}
-          usePanelInfo={props.usePanelInfo}
+          useSession={useSessionMaybe}
+          useConversation={useConversationMaybe}
+          useSessions={useSessions}
+          usePanelInfo={usePanelInfo}
           useSessionStatus={useSessionStatus}
           useSessionRetainInfo={() => undefined}
-          useWorkspaces={props.useWorkspaces}
+          useWorkspaces={useWorkspaces}
           {...allowAllAccess}
           useProjection={(() => undefined)}
           useInput={useInput}
-          inputActions={inputActions}
+          inputActions={binding.sessionId === undefined ? undefined : inputActions}
           keyboard={wiring}
           addFiles={() => null}
           useFileUploads={bindSnapshotSelector(createSnapshotStore({}))}
@@ -349,63 +433,122 @@ function mount(
       : (opts?.fallback ?? null)
   )) as ConversationContentProps['renderSlotChain']
   const SessionProvider: ConversationContentProps['SessionProvider'] = ({ children }) => children
-  const renderFactorySlot = ((_name: string, input: ConversationContentInputProps, factoryOptions?: {
-    slots?: Record<string, (props: never) => ReactNode>
-  }) => {
-    if (options.headerOnly) return null
-    const common: ConversationViewsProps = {
-      sessionId: SID,
-      SessionProvider,
-      useSession,
-      useConversation,
-      useChat,
-      useTrajectory,
-      useSessions: bindSnapshotSelector(sessions),
-      usePanelInfo: selector => selector({ activePanelId: null }),
-      useContextMenu: contextMenuHook(),
-      useResource,
-      useSessionStatus,
-      useSessionRetainInfo: () => undefined,
-      useWorkspaces: bindSnapshotSelector(workspaces),
-      ...allowAllAccess,
-      useProjection: (() => undefined),
-      useComposerBlock: select => select(options.composerBlock),
-      useInput,
-      inputActions,
-      renderSlot,
-      renderSlotChain,
-      renderFactorySlot,
-      selectWorkspace: retargetWorkspace,
-      t,
-    }
-    const useFactorySlot = ((name: string, fallback: (props: never) => ReactNode) => (
-      name === 'views' ? StableConversationViews : factoryOptions?.slots?.[name] ?? fallback
-    )) as ConversationContentProps['useFactorySlot']
-    return (
-      <FactoryViewsTestContext.Provider value={common}>
-        <ConversationContent {...({ ...common, ...runtimeProps, ...input, useFactorySlot })} />
-      </FactoryViewsTestContext.Provider>
-    )
-  }) as ConversationSlotProps['renderFactorySlot']
-  const runtimeProps: PropsRuntime<'main.conversation'> & Pick<ConversationSlotProps, 'SessionProvider'> = {
-    usePanelInfo: selector => selector({ activePanelId: null }),
-    sessionId,
+  /** Standard Session-maybe inputs of one window or content occurrence. */
+  const maybeProps = (): WindowRuntime => ({
+    sessionId: binding.sessionId,
     SessionProvider,
-    useSession: sessionId === undefined ? () => undefined : useSession,
-    useConversation: sessionId === undefined ? () => undefined : useConversation,
-    useSessions: bindSnapshotSelector(sessions),
+    useSession: useSessionMaybe,
+    useConversation: useConversationMaybe,
+    useSessions,
     useSessionStatus,
     useSessionRetainInfo: () => undefined,
     useContextMenu: contextMenuHook(),
     useResource,
-    useWorkspaces: bindSnapshotSelector(workspaces),
+    usePanelInfo,
+    useWorkspaces,
     ...allowAllAccess,
     useProjection: (() => undefined),
     useInput,
-    inputActions,
+    inputActions: binding.sessionId === undefined ? undefined : inputActions,
+  })
+  /** The window declares no local slot; an occurrence still carries the selector seat. */
+  const windowUseFactorySlot = ((_name: string, fallback: (props: object) => ReactNode) => fallback) as ConversationWindowProps['useFactorySlot']
+  const renderFactorySlot = ((
+    name: string,
+    input: object,
+    factoryOptions?: { slots?: Record<string, (props: never) => ReactNode> },
+  ) => {
+    if (name === 'conversation.window') {
+      return (
+        <ConversationWindow
+          {...maybeProps()}
+          {...(input as ConversationWindowInputProps)}
+          useFactorySlot={windowUseFactorySlot}
+          renderSlot={renderSlot as never}
+          renderFactorySlot={renderFactorySlot as never}
+        />
+      )
+    }
+    // `headerOnly` isolates header capability checks from the composer's layout observers.
+    if (options.headerOnly) return null
+    /** Session-scoped inputs of the content occurrence's `views` local position. */
+    const viewsSeats: ConversationViewsProps | undefined = binding.sessionId === undefined
+      ? undefined
+      : {
+        ...maybeProps(),
+        sessionId: boundSessionId(),
+        useSession: useSessionStrict,
+        useConversation: useConversationStrict,
+        ...allowAllAccess,
+        useInput,
+        inputActions,
+        useChat,
+        useTrajectory,
+        renderSlot,
+        renderSlotChain,
+        renderFactorySlot,
+        selectWorkspace: retargetWorkspace,
+        useComposerBlock: select => select(options.composerBlock),
+        t,
+      }
+    const useFactorySlot = ((name: string, fallback: (props: never) => ReactNode) => (
+      name === 'views' ? StableConversationViews : factoryOptions?.slots?.[name] ?? fallback
+    )) as ConversationContentProps['useFactorySlot']
+    return (
+      <FactoryViewsTestContext.Provider value={viewsSeats}>
+        <ConversationContent
+          {...maybeProps()}
+          {...(input as ConversationContentInputProps)}
+          renderSlot={renderSlot as never}
+          renderSlotChain={renderSlotChain as never}
+          renderFactorySlot={renderFactorySlot as never}
+          selectWorkspace={retargetWorkspace}
+          useComposerBlock={select => select(options.composerBlock)}
+          t={t}
+          useFactorySlot={useFactorySlot}
+        />
+      </FactoryViewsTestContext.Provider>
+    )
+  }) as ConversationSlotProps['renderFactorySlot']
+  const tree = () => {
+    if (options.bodyOnly === true) {
+      return <>{renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })}</>
+    }
+    if (options.windowVariant === 'embedded') {
+      return (
+        <div data-testid="embedded-window">
+          <ConversationWindow
+            {...maybeProps()}
+            variant="embedded"
+            useFactorySlot={windowUseFactorySlot}
+            renderSlot={renderSlot as never}
+            renderFactorySlot={renderFactorySlot as never}
+          />
+        </div>
+      )
+    }
+    const mainSeat = (
+      <div data-testid="main-window">
+        <ConversationRoot {...maybeProps()} renderFactorySlot={renderFactorySlot as never} />
+      </div>
+    )
+    if (options.withEmbedded !== true) return mainSeat
+    return (
+      <>
+        {mainSeat}
+        <div data-testid="embedded-window">
+          <ConversationWindow
+            {...maybeProps()}
+            variant="embedded"
+            useFactorySlot={windowUseFactorySlot}
+            renderSlot={renderSlot as never}
+            renderFactorySlot={renderFactorySlot as never}
+          />
+        </div>
+      </>
+    )
   }
-  const props: ConversationSlotProps = { ...runtimeProps, renderSlot, renderFactorySlot }
-  const view = render(<ConversationMainPanel {...props} />)
+  const view = render(tree())
   return {
     view, store, wiring, sink, retargetWorkspace, session, conversation, slotCalls, headerFactory, lineageOwners, seatOwners, open,
     pickerOwner: () => pickerOwner,
@@ -415,7 +558,15 @@ function mount(
       if (actionsOwner === undefined) throw new Error('View actions not rendered')
       return actionsOwner
     },
-    rerender: () => { view.rerender(<ConversationMainPanel {...props} />) },
+    /** Publish a new View roster. */
+    setViewTabs: (tabs: readonly ViewTab[]) => { roster.set(tabs) },
+    /** Move the window onto another Session area and re-render. */
+    bind: (next: SessionId) => {
+      binding.sessionId = next
+      binding.session = next === SID2 ? otherSession : session
+      view.rerender(tree())
+    },
+    rerender: () => { view.rerender(tree()) },
   }
 }
 
@@ -464,6 +615,22 @@ describe('ConversationRoot resident composer', () => {
     })
 
     expect(dispatchCount()).toBe(before)
+  })
+
+  it('repaints the window from a Session publication', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }))
+    const phase = (): string | null => b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase') ?? null
+    expect(phase()).toBe('hero')
+    // No explicit rerender: the subscription must carry this on its own, or the
+    // unrelated-publication case below would pass vacuously.
+    act(() => { b.session.set(sessionSnapshotOf({ blank: false })) })
+    expect(phase()).toBe('active')
+  })
+
+  it('renders the blank home while the assembled Conversation is absent', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { conversationAbsent: true })
+    expect(b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('hero')
+    expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
   it('renders the composer inert with the blocker\u2019s own reason', () => {
@@ -704,8 +871,7 @@ describe('ConversationRoot resident composer', () => {
     act(() => { b.store.actions.setView('removed-view') })
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
 
-    viewTabs.unshift({ id: 'new-view', label: 'New view' })
-    b.rerender()
+    act(() => { b.setViewTabs([{ id: 'new-view', label: 'New view' }, ...viewTabs]) })
 
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
     expect(b.view.queryByTestId('view-new-view')).toBeNull()
@@ -814,8 +980,11 @@ describe('ConversationRoot resident composer', () => {
     act(() => { b.store.actions.setView('timeline') })
     expect(rowReads()).toBe(reads)
     expect(external()).toEqual(['Chat', 'Trajectory', 'Timeline'])
-    viewTabs.splice(1, 1)
-    act(() => { b.store.actions.setView('chat') })
+    const withoutTrajectory = viewTabs.filter(tab => tab.id !== 'trajectory')
+    act(() => {
+      b.setViewTabs(withoutTrajectory)
+      b.store.actions.setView('chat')
+    })
     expect(external()).toEqual(['Chat', 'Timeline', 'Inspector'])
     expect(rowReads()).toBe(reads)
     expect(b.actionsOwner().entries).toEqual([])
@@ -878,12 +1047,13 @@ describe('ConversationRoot resident composer', () => {
     expect(more.getAttribute('aria-expanded')).toBe('true')
     expect(within(b.view.getByRole('menu')).getByRole('menuitem', { name: 'Header view action' })).toBeTruthy()
     expect(b.actionsOwner().entries).toEqual([{ id: 'trajectory', label: 'Trajectory', pinned: false, active: false }])
-    b.actionsOwner().onPinnedChange('trajectory', true)
+    act(() => { b.actionsOwner().onPinnedChange('trajectory', true) })
     expect(b.setPinned).toHaveBeenCalledExactlyOnceWith('trajectory', true)
     act(() => { b.actionsOwner().onOpen('trajectory') })
     expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
-    expect(b.view.queryByRole('tab', { name: 'Trajectory' })).toBeNull()
-    expect(b.actionsOwner().entries).toEqual([{ id: 'trajectory', label: 'Trajectory', pinned: false, active: true }])
+    // The pin is real state now: pinning the View leaves More (where the width
+    // budget still folds it) but the row reports the new pin truth.
+    expect(b.actionsOwner().entries).toEqual([{ id: 'trajectory', label: 'Trajectory', pinned: true, active: true }])
     fireEvent.click(b.view.getByRole('menuitem', { name: 'Header view action' }))
     expect(b.view.queryByRole('menu')).toBeNull()
     expect(more.getAttribute('aria-expanded')).toBe('false')
@@ -1074,4 +1244,122 @@ describe('ConversationRoot resident composer', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
     expect(b.view.container.querySelector('[data-width-handle]')).toBeNull()
   })
+})
+
+describe('Conversation window', () => {
+  it('keeps the resident header row, its drag marker, and its leading seat in the main variant', () => {
+    const b = mount(sessionSnapshotOf())
+    const header = b.view.container.querySelector('header')
+    expect(header).not.toBeNull()
+    expect(header?.hasAttribute('data-window-drag')).toBe(true)
+    expect(header?.querySelector('[data-conversation-header-leading]')).not.toBeNull()
+    expect(b.slotCalls).toContain('conversation.header.leading')
+    expect(b.view.container.querySelector('[data-conversation-header-embedded]')).toBeNull()
+  })
+
+  it('renders the Session header without global navigation or window dragging when embedded', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { windowVariant: 'embedded' })
+    expect(b.view.container.querySelector('header')).toBeNull()
+    const embedded = b.view.container.querySelector('[data-conversation-header-embedded]')
+    expect(embedded).not.toBeNull()
+    expect(embedded?.hasAttribute('data-window-drag')).toBe(false)
+    expect(b.view.container.querySelector('[data-conversation-header-leading]')).toBeNull()
+    expect(b.slotCalls).not.toContain('conversation.header.leading')
+    // The Session header is the same registered presentation, not a copy.
+    expect(within(embedded as HTMLElement).getByText('Child')).toBeTruthy()
+    expect(within(embedded as HTMLElement).getByRole('tablist')).toBeTruthy()
+  })
+
+  it('serves every header extension point in both variants', () => {
+    for (const windowVariant of ['main', 'embedded'] as const) {
+      const b = mount(sessionSnapshotOf(), undefined, undefined, { windowVariant, entryActions: true })
+      expect(b.slotCalls).toEqual(expect.arrayContaining([
+        'conversation.session.header.lineage',
+        'conversation.session.header.actions',
+        'conversation.session.header.utilities',
+        'conversation.session.header.corner',
+      ]))
+      // The seats render, they are not merely dispatched.
+      for (const seat of ['actions', 'utilities', 'corner']) {
+        expect(b.view.container.querySelector(`[data-testid="view-conversation.session.header.${seat}"]`)).not.toBeNull()
+      }
+      fireEvent.click(b.view.getByRole('button', { name: zh['session.moreViews'] }))
+      expect(b.slotCalls).toContain('conversation.session.header.views.actions')
+      expect(b.view.getByRole('menuitem', { name: 'Header view action' })).toBeTruthy()
+      cleanup()
+    }
+  })
+
+  it('follows the Session area around the occurrence instead of a global selection', () => {
+    const b = mount(sessionSnapshotOf())
+    expect(b.view.getByText('Child')).toBeTruthy()
+    act(() => { b.bind(SID2) })
+    expect(b.view.getByText('Second')).toBeTruthy()
+    expect(b.view.queryByText('Child')).toBeNull()
+    expect(b.view.getByRole('tablist')).toBeTruthy()
+    act(() => { b.bind(SID) })
+    expect(b.view.getByText('Child')).toBeTruthy()
+  })
+
+  it('unpinning a View in the embedded window removes its tab in both occurrences', () => {
+    // A wide row keeps both tabs outside More, so the pin is the only thing
+    // that can remove one.
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { withEmbedded: true, entryActions: true })
+    const mainWindow = b.view.getByTestId('main-window')
+    const embeddedWindow = b.view.getByTestId('embedded-window')
+    const tabs = (root: HTMLElement): (string | null)[] =>
+      within(root).getAllByRole('tab').map(tab => tab.textContent)
+    expect(tabs(mainWindow)).toEqual(['Chat', 'Trajectory'])
+    expect(tabs(embeddedWindow)).toEqual(['Chat', 'Trajectory'])
+
+    fireEvent.click(within(embeddedWindow).getByRole('button', { name: zh['session.moreViews'] }))
+    act(() => { b.actionsOwner().onPinnedChange('trajectory', false) })
+
+    // One pin list for every occurrence: the tab leaves both headers, and the
+    // View stays reachable from More.
+    expect(tabs(mainWindow)).toEqual(['Chat'])
+    expect(tabs(embeddedWindow)).toEqual(['Chat'])
+  })
+
+  it('renders the body-only composition with its own View selection and no chrome', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { bodyOnly: true })
+    expect(b.view.container.querySelector('header')).toBeNull()
+    expect(b.view.container.querySelector('[data-conversation-header-embedded]')).toBeNull()
+    expect(b.view.container.querySelector('[data-conversation-header-leading]')).toBeNull()
+    expect(b.view.queryByRole('tablist')).toBeNull()
+    expect(b.view.queryByTestId('view-conversation.session.header.corner')).toBeNull()
+    // The body and Composer still render, with the View its own adapter selected.
+    expect(b.view.container.querySelector('[data-conversation-content]')).not.toBeNull()
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
+    expect(b.view.getByRole('textbox')).toBeTruthy()
+  })
+
+  it('renders the empty embedded window without a Session area and reports no failure', () => {
+    const b = mount(sessionSnapshotOf(), [], undefined, { sessionId: undefined, windowVariant: 'embedded' })
+    expect(b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('hero')
+    expect(b.view.container.querySelector('[data-conversation-header-embedded]')).not.toBeNull()
+    expect(b.view.container.querySelector('header')).toBeNull()
+    expect(b.view.getByRole('textbox')).toBeTruthy()
+    expect(b.view.queryByRole('tablist')).toBeNull()
+    expect(b.view.queryByTestId('view-chat')).toBeNull()
+  })
+
+  it('shares the View selection between the resident seat and an embedded occurrence', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { withEmbedded: true })
+    const mainWindow = b.view.getByTestId('main-window')
+    const embeddedWindow = b.view.getByTestId('embedded-window')
+    const labels = (root: HTMLElement) => within(root).getAllByRole('tab').map(tab => tab.textContent)
+    expect(labels(mainWindow)).toEqual(['Chat', 'Trajectory'])
+    expect(labels(embeddedWindow)).toEqual(['Chat', 'Trajectory'])
+
+    fireEvent.click(within(embeddedWindow).getByRole('tab', { name: 'Trajectory' }))
+
+    // One store per Session: the embedded header's choice reaches both bodies.
+    expect(within(embeddedWindow).getByTestId('view-trajectory')).toBeTruthy()
+    expect(within(mainWindow).getByTestId('view-trajectory')).toBeTruthy()
+    expect(within(mainWindow).getByRole('tab', { name: 'Trajectory' }).getAttribute('aria-selected')).toBe('true')
+    expect(within(embeddedWindow).getByRole('tab', { name: 'Trajectory' }).getAttribute('aria-selected')).toBe('true')
+  })
+
 })

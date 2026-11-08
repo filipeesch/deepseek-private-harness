@@ -924,10 +924,12 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     key: 'conversation.header',
     kind: 'single',
     scope: 'session-maybe',
-    summary: 'Resident navigation container, including when no Session is selected.',
-    doc: 'Resident navigation container, including when no Session is selected.',
+    summary: 'Conversation header, rendered by the window with the chrome the occurrence asked for.',
+    doc: 'Conversation header, rendered by the window with the chrome the occurrence asked for.',
     registerOptions: [],
-    ownerProps: [],
+    ownerProps: [
+      '/**\n * Owner share of the Conversation header.\n */\nexport interface ConversationHeaderOwnerProps {\n  /**\n   * Chrome variant of this render. `main` renders the resident header row: the\n   * leading global-navigation seat, the window-drag marker, and the main\n   * column\'s geometry. `embedded` renders the Session header alone, for a host\n   * surface that already owns its own chrome.\n   */\n  readonly variant: \'main\' | \'embedded\'\n}',
+    ],
     ownerPropsReferences: [],
     standardProps: [
       'useRemoteAccess: (action: RemoteEndpoint) => boolean',
@@ -951,7 +953,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     keyDomain: '',
     hookContext: '',
     slotInject: '',
-    declaredBy: 'an entry in \'main.conversation\' (client-ui-conversation), so it exists while that entry is mounted',
+    declaredBy: 'factory \'conversation.window\' (client-ui-conversation), so it exists while that definition is registered',
     occupants: [
       'client-ui-conversation ConversationHeader',
     ],

@@ -13,8 +13,16 @@ usePinnedBrowserLanguages('zh-CN')
 
 const SID = 'session-1' as SessionId
 
-async function bench(options: { declareConversation?: boolean } = {}) {
+async function bench(options: {
+  declareConversation?: boolean
+  /** Render the conversation column instead of a frame that renders nothing. */
+  renderColumn?: boolean
+  /** Register a header leading seat that throws while rendering. */
+  crashingLeading?: boolean
+} = {}) {
   const runtime = await SlotTestRuntime.create()
+  const reported: string[] = []
+  runtime.slots.onEntryError((key) => { reported.push(key) })
   const developerTools = createSnapshotStore(true)
   runtime.ctx.provide('uiWorkspace', {
     openWorkspace: vi.fn(async (_workspaceId: unknown, beforeOpen: (id: SessionId) => void) => {
@@ -29,14 +37,22 @@ async function bench(options: { declareConversation?: boolean } = {}) {
   runtime.ctx.provide('shortcuts', { catalog: createSnapshotStore([]) })
   await runtime.mount({ inject: [...injectMenus], apply: applyMenus })
   if (options.declareConversation !== false) {
-    await runtime.root.declare({
+    const children = {
       'main': { kind: 'keyed', scope: 'root' },
       'settings.general.item': { kind: 'list', scope: 'root' },
-    }, (_props: { renderSlot?: unknown }) => null)
+    } as const
+    if (options.renderColumn === true) {
+      await runtime.root.declare(children, props => props.renderSlot('main', {}, { entryKey: 'conversation' }))
+    } else {
+      await runtime.root.declare(children, (_props: { renderSlot?: unknown }) => null)
+    }
   }
   const feature = await runtime.mount({ inject: [...inject], apply })
-  if (options.declareConversation !== false) runtime.renderRoot()
-  return { runtime, feature, developerTools }
+  if (options.crashingLeading === true) {
+    runtime.slots.register({ name: 'conversation.header.leading' }, () => { throw new Error('header seat failed') })
+  }
+  const view = options.declareConversation === false ? undefined : runtime.renderRoot()
+  return { runtime, feature, developerTools, reported, view }
 }
 
 function entry(
@@ -106,6 +122,15 @@ describe('target-neutral Conversation apply wiring', () => {
       .toEqual({ kind: 'single', scope: 'session-maybe' })
     expect(b.runtime.factoryOf('conversation.content').slots)
       .toMatchObject({ views: { scope: 'session' } })
+    // The window owns the header declaration, so any host can render the whole
+    // window without registering into the main panel.
+    const window = b.runtime.slots.snapshot('factory:conversation.window')[0]
+    expect(window?.type).toBe('factory')
+    expect(window?.children.map(child => child.name)).toEqual(['conversation.header'])
+    const headerNode = b.runtime.slots.snapshot('conversation.header')[0]
+    if (headerNode?.type !== 'slot') throw new Error('conversation.header is not a declared slot')
+    expect(headerNode.declaredBy).toContain('factory "conversation.window"')
+    expect(b.runtime.slots.entries('main.conversation')[0]?.children).toBeUndefined()
     expect(b.runtime.slots.entries('conversation.session')).toHaveLength(1)
     expect(b.runtime.slots.entries('conversation.session.header')).toHaveLength(1)
     expect(b.runtime.slots.spec('conversation.header')).toEqual({ kind: 'single', scope: 'session-maybe' })
@@ -128,6 +153,12 @@ describe('target-neutral Conversation apply wiring', () => {
     const header = entry(b.runtime, 'conversation.session.header')
     expect(entry(b.runtime, 'main.conversation')?.store).toBeUndefined()
     expect(b.runtime.factoryOf('conversation.content').store).toBeUndefined()
+    // The window must not carry the store: the handle is pinned to `session`
+    // scope by the Session body and header, and the window is `session-maybe`.
+    const window = b.runtime.factoryOf('conversation.window')
+    expect(window.scope).toBe('session-maybe')
+    expect(window.store).toBeUndefined()
+    expect(window.inject).toBeUndefined()
     expect(session?.store).toBeDefined()
     expect(header?.store).toBe(session?.store)
     expect(b.runtime.slots.spec('conversation.composer'))
@@ -166,6 +197,25 @@ describe('target-neutral Conversation apply wiring', () => {
     disposeView()
     await vi.waitFor(() => { expect(source?.getSnapshot()).toEqual([]) })
     await b.runtime.dispose()
+  })
+
+
+  it('contains a crashing header entry, reports it, and keeps the rest of the window rendering', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const b = await bench({ renderColumn: true, crashingLeading: true })
+      // The header renders through ordinary Slot dispatch, so a failing entry
+      // stays with the composition: reported against that entry, retired, and
+      // replaced by the crash face in its own cell. The rest of the window —
+      // header chrome and body — keeps rendering.
+      expect(b.reported).toContain('conversation.header.leading')
+      expect(b.view?.container.querySelector('[data-slot-error="conversation.header.leading"]')).not.toBeNull()
+      expect(b.view?.container.querySelector('[data-conversation-header-leading]')).not.toBeNull()
+      expect(b.view?.container.querySelector('[data-conversation-content]')).not.toBeNull()
+      await b.runtime.dispose()
+    } finally {
+      consoleError.mockRestore()
+    }
   })
 
   it('removes services, entries, and declarations with the plugin fiber', async () => {

@@ -82,7 +82,7 @@ Factory 不拥有 Conversation store。普通 `conversation.session` body 与 `c
 
 **把普通 Slot 复用为可移植 definition。** 普通 Slot 属于一个 parent 声明以及全局树中的一个位置。在其他位置复用它会借用错误的所有权与生命周期。
 
-**把主 Conversation Header 移进 Factory。** 只有主 host 渲染该 Header。将其留在 Factory 外，使嵌入式 occurrence 无需另一个局部选择即可省略 Header，并保留其现有 strict-Session Slot 生命周期。
+**把主 Conversation Header 移进 Factory。** 只有主 host 渲染该 Header。将其留在 Factory 外，使嵌入式 occurrence 无需另一个局部选择即可省略 Header，并保留其现有 strict-Session Slot 生命周期。 *已由[对话窗口 Factory](2026-11-08-conversation-window-factory.zh.md) 推翻：主面板之外的宿主需要同一个 header，因此由窗口声明它，主面板则调用窗口。*
 
 **把共享 Conversation store 移到 optional-Session Factory。** Header 与 Session body 共享一个 strict-Session handle。将该 handle 同时挂到 `session-maybe` Factory 和 `session` Header 会违反 one-handle-one-scope 规则。
 

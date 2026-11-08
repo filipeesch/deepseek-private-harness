@@ -32,6 +32,14 @@ describe('conversation header geometry', () => {
     expect(css.match(/^\.headerCorner\s*\{([^}]*)\}/m)?.[1]).toContain('margin-left: 8px')
   })
 
+  it('clears the app frame clearance for an embedded window header', () => {
+    const embedded = css.match(/\.headerEmbedded\s*\{([^}]*)\}/)?.[1]
+    expect(embedded).toContain('--dsh-frame-leading-clearance: 0px')
+    expect(embedded).toContain('padding-inline-start: 16px')
+    // The end padding keeps the corner seat's -16px reach inside the row.
+    expect(embedded).not.toContain('padding:')
+  })
+
   it('uses 32px between view labels without changing the action gap', () => {
     expect(css.match(/\.viewTabs\s*\{([^}]*)\}/)?.[1]).toContain('gap: 32px')
     expect(css.match(/\.tabs\s*\{([^}]*)\}/)?.[1]).toContain('gap: 16px 20px')

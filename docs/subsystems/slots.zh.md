@@ -140,16 +140,17 @@ Renderer 还会根据声明的 store 创建 `useStore`，并根据声明的 loca
 ```text
 root [AppFrame]
 └─ main[key=conversation] [ConversationPanel]
-   └─ main.conversation [ConversationRoot / ConversationMainPanel]
-      ├─ conversation.header [ConversationHeader]
-      │  ├─ conversation.header.leading
-      │  └─ conversation.session.header [ConversationSessionHeader]
-      │     ├─ conversation.session.header.lineage
-      │     ├─ conversation.session.header.actions
-      │     ├─ conversation.session.header.utilities
-      │     ├─ conversation.session.header.views.actions
-      │     └─ conversation.session.header.corner
-      └─ calls Factory: conversation.content
+   └─ main.conversation [ConversationRoot]
+      └─ calls Factory: conversation.window [ConversationWindow]
+         ├─ conversation.header [ConversationHeader]
+         │  ├─ conversation.header.leading
+         │  └─ conversation.session.header [ConversationSessionHeader]
+         │     ├─ conversation.session.header.lineage
+         │     ├─ conversation.session.header.actions
+         │     ├─ conversation.session.header.utilities
+         │     ├─ conversation.session.header.views.actions
+         │     └─ conversation.session.header.corner
+         └─ calls Factory: conversation.content
 
 Factory: conversation.content [ConversationContent]
 ├─ conversation.session [ConversationSession / DefaultConversationViews]
