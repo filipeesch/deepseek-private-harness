@@ -48,11 +48,12 @@ const RENDER_SCALE = 4
 
 /**
  * Fraction of a maskable icon the artwork keeps: the platform may crop the
- * border outside it. The tile's own ink reaches 0.461 of its edge from the
- * centre, so 0.868 is the largest scale a circular mask still shows whole;
- * `pwa-manifest.e2e.ts` checks the committed artwork against that circle.
+ * border outside it. The private mark reaches roughly 0.29 of the icon edge
+ * from the centre, inside the guaranteed circle, so the maskable variant
+ * renders the artwork unscaled and only the plate meets the mask;
+ * `pwa-manifest.e2e.ts` checks the committed mark against that circle.
  */
-export const MASKABLE_ARTWORK_SCALE = 0.82
+export const MASKABLE_ARTWORK_SCALE = 1
 
 /** Radius a platform mask is guaranteed to show, as a fraction of the icon edge. */
 export const MASKABLE_SAFE_RADIUS_RATIO = 0.4

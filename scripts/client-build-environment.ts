@@ -25,7 +25,7 @@ const OFFICIAL_CLIENT_BUILD_ENVIRONMENT = {
 /** Public client environment this distribution's local builds present. */
 const LOCAL_CLIENT_BUILD_ENVIRONMENT = {
   DSH_CLIENT_BUILD_PROFILE: 'local',
-  DSH_CLIENT_TITLE: 'DSH Private',
+  DSH_CLIENT_TITLE: 'Private DSH',
 } as const
 
 /** Public variable carrying the source commit embedded in client artifacts. */

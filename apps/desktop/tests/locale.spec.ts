@@ -47,11 +47,11 @@ describe('desktop locale dictionaries', () => {
   ] as const)('keeps %s brand texts private and application identity unchanged', (_id, messages) => {
     // Brand texts describe the product; identity strings name the installed
     // application, whose bundle keeps the upstream name.
-    expect(messages.aboutProduct).toBe('DSH Private')
-    expect(messages.welcomeTitle).toBe('DSH Private')
-    expect(messages.welcomeBrand).toBe('DSH Private')
-    expect(messages.updateTitle).toContain('DSH Private')
-    expect(messages.startupFailed).toContain('DSH Private')
+    expect(messages.aboutProduct).toBe('Private DSH')
+    expect(messages.welcomeTitle).toBe('Private DSH')
+    expect(messages.welcomeBrand).toBe('Private DSH')
+    expect(messages.updateTitle).toContain('Private DSH')
+    expect(messages.startupFailed).toContain('Private DSH')
     expect(messages.updateTitle).not.toContain('DeepSeek Harness')
     expect(messages.startupFailed).not.toContain('DeepSeek Harness')
     for (const identity of [
@@ -59,7 +59,7 @@ describe('desktop locale dictionaries', () => {
       messages.openApplication, messages.quitTitle,
     ]) {
       expect(identity).toContain('DeepSeek Harness')
-      expect(identity).not.toContain('DSH Private')
+      expect(identity).not.toContain('Private DSH')
     }
   })
 
