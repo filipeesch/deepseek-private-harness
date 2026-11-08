@@ -64,19 +64,20 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   if (clientBuildValue('DSH_CLIENT_BUILD_PROFILE') === 'official') {
     expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
     expect(screen.queryByText('DSH Local Build')).toBeNull()
-    expect(screen.queryByText('DSH Private')).toBeNull()
+    expect(screen.queryByText('Private DSH')).toBeNull()
   } else {
-    expect(document.querySelector('svg[viewBox="0 0 23.16 17.04"]')).not.toBeNull()
+    // The private mark is a square shield, not the upstream whale silhouette.
+    expect(document.querySelector('svg[viewBox="0 0 24 24"]')).not.toBeNull()
     const version = clientBuildValue('DSH_CLIENT_VERSION')
     if (version === undefined) throw new Error('default client build record must carry DSH_CLIENT_VERSION')
     const commit = clientBuildValue('DSH_CLIENT_COMMIT_HASH')
     const buildVersion = version
       + (commit === undefined ? '' : `-${commit}`)
       + (clientBuildValue('DSH_CLIENT_GIT_DIRTY') === 'true' ? '-dirty' : '')
-    screen.getByText('DSH Private')
+    screen.getByText('Private DSH')
     screen.getByText(buildVersion)
     // The build title reaches the document, not only the sidebar row.
-    expect(document.title).toContain('DSH Private')
+    expect(document.title).toContain('Private DSH')
   }
   // The compact layout dropped group session counts; the fixture workspace
   // group row renders immediately with its sessions beneath it.

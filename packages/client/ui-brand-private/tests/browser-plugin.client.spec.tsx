@@ -21,10 +21,13 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { apply as sidebarApply, inject as sidebarInject } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject } from '../src/client/index.ts'
+import { MARK_PATH } from '../src/client/mark.ts'
 import { apply as hostApply } from '../src/index.ts'
 
-/** The single seat this package occupies. */
+/** Seats this package occupies. */
 const HOLE = 'sidebar.brand.name'
+const MARK_HOLE = 'sidebar.brand.mark'
+const HERO_HOLE = 'conversation.hero.brand.mark'
 
 afterEach(() => {
   cleanup()
@@ -47,7 +50,11 @@ async function bench(language = 'en') {
   locale.setLocale(language)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
-  await runtime.declare({ [HOLE]: { kind: 'single', scope: 'root' } })
+  await runtime.declare({
+    [HOLE]: { kind: 'single', scope: 'root' },
+    [MARK_HOLE]: { kind: 'single', scope: 'root' },
+    [HERO_HOLE]: { kind: 'single', scope: 'root' },
+  })
   const feature = await runtime.mount({ inject: [...inject], apply })
   return { runtime, feature, locale }
 }
@@ -92,7 +99,7 @@ describe('private browser-brand plugin', () => {
     const { runtime } = await bench()
     const slot = runtime.renderSlot(HOLE, {})
 
-    expect(slot.view.getByText('DSH Private')).toBeTruthy()
+    expect(slot.view.getByText('Private DSH')).toBeTruthy()
     const pill = slot.view.getByText('1.2.3-abcdef0')
     expect(pill.hasAttribute('data-copy-version')).toBe(true)
     await runtime.dispose()
@@ -104,7 +111,7 @@ describe('private browser-brand plugin', () => {
     const { runtime } = await bench()
     const slot = runtime.renderSlot(HOLE, {})
 
-    expect(slot.view.getByText('DSH Private')).toBeTruthy()
+    expect(slot.view.getByText('Private DSH')).toBeTruthy()
     expect(slot.container.querySelector('[data-copy-version]')).toBeNull()
     await runtime.dispose()
   })
@@ -190,7 +197,7 @@ describe('private browser-brand plugin', () => {
     expect(startSession).not.toHaveBeenCalled()
 
     // Contrast: the rest of the brand row still opens a New Session.
-    await act(async () => { slot.view.getByText('DSH Private').click() })
+    await act(async () => { slot.view.getByText('Private DSH').click() })
     expect(startSession).toHaveBeenCalledTimes(1)
     await runtime.dispose()
   })
@@ -205,7 +212,11 @@ describe('private browser-brand plugin', () => {
     await runtime.mount({ inject: [...inject], apply })
     expect(runtime.slots.entries(HOLE)).toHaveLength(0)
 
-    await runtime.declare({ [HOLE]: { kind: 'single', scope: 'root' } })
+    await runtime.declare({
+      [HOLE]: { kind: 'single', scope: 'root' },
+      [MARK_HOLE]: { kind: 'single', scope: 'root' },
+      [HERO_HOLE]: { kind: 'single', scope: 'root' },
+    })
     await Promise.resolve()
     expect(runtime.slots.entries(HOLE)).toHaveLength(1)
     await runtime.dispose()
@@ -218,6 +229,8 @@ describe('private browser-brand plugin', () => {
 
     await feature.dispose()
     expect(runtime.slots.entries(HOLE)).toHaveLength(0)
+    expect(runtime.slots.entries(MARK_HOLE)).toHaveLength(0)
+    expect(runtime.slots.entries(HERO_HOLE)).toHaveLength(0)
     await runtime.dispose()
   })
 
@@ -229,13 +242,58 @@ describe('private browser-brand plugin', () => {
     const { runtime, locale } = await benchLocale('pt')
     const slot = runtime.renderSlot(HOLE, {})
 
-    expect(slot.view.getByText('DSH Private')).toBeTruthy()
+    expect(slot.view.getByText('Private DSH')).toBeTruthy()
     await act(async () => {
       slot.view.getByText('1.2.3').click()
       await Promise.resolve()
     })
     expect(screen.getByText('Versão copiada')).toBeTruthy()
     void locale
+    await runtime.dispose()
+  })
+
+  it('fills the sidebar mark and the hero mark on a local build', async () => {
+    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'local')
+    const { runtime } = await bench()
+    expect(runtime.slots.entries(MARK_HOLE)).toHaveLength(1)
+    expect(runtime.slots.entries(HERO_HOLE)).toHaveLength(1)
+    await runtime.dispose()
+  })
+
+  it('leaves both mark seats to the official artwork on an official build', async () => {
+    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'official')
+    const { runtime } = await bench()
+    expect(runtime.slots.entries(MARK_HOLE)).toHaveLength(0)
+    expect(runtime.slots.entries(HERO_HOLE)).toHaveLength(0)
+    await runtime.dispose()
+  })
+
+  it('renders the mark as a shield with the whale knocked out', async () => {
+    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'local')
+    const { runtime } = await bench()
+    const slot = runtime.renderSlot(MARK_HOLE, { size: 24 })
+    const svg = slot.container.querySelector('svg')
+    if (svg === null) throw new Error('mark svg missing')
+    expect(svg.getAttribute('width')).toBe('24')
+    expect(svg.getAttribute('fill')).toBe('none')
+    const mark = svg.querySelector('path')
+    if (mark === null) throw new Error('mark path missing')
+    // The whale is a hole in the same path, so the mark carries the theme ink once.
+    expect(mark.getAttribute('fill')).toBe('currentColor')
+    expect(mark.getAttribute('fill-rule')).toBe('evenodd')
+    expect(mark.getAttribute('d')).toBe(MARK_PATH)
+    await runtime.dispose()
+  })
+
+  it('renders the hero mark at the requested size with the host class', async () => {
+    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'local')
+    const { runtime } = await bench()
+    const slot = runtime.renderSlot(HERO_HOLE, { size: 34, className: 'hero-fish' })
+    const svg = slot.container.querySelector('svg')
+    if (svg === null) throw new Error('hero mark svg missing')
+    expect(svg.getAttribute('width')).toBe('34')
+    expect(svg.classList.contains('hero-fish')).toBe(true)
+    expect(svg.querySelector('animate')).toBeNull()
     await runtime.dispose()
   })
   it('withdraws the occupant when the declaration collapses', async () => {
