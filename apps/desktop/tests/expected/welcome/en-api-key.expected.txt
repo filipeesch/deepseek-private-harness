@@ -1,5 +1,5 @@
-DSH Private
-DSH Private
+Private DSH
+Private DSH
 Add an API key to get started
 Configure official DeepSeek models to start using Harness
 Enter API key [password]

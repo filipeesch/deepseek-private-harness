@@ -3,32 +3,32 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-brand-private/README.md
 /:
-  en: 1aadffa46727cc9b
-  zh: 9be7fd3b3a3a5907
+  en: 790efc8e291fcdbf
+  zh: 9f9c6958dc36d8c1
 /deepseek-ai-dsh-client-ui-brand-private:
   en: dd028046583bc726
   zh: 0fae6ada4d137a47
 /deepseek-ai-dsh-client-ui-brand-private/summary:
-  en: 40066e90207832e6
-  zh: ac2ae7a5826e5fa6
+  en: 6dd9ba0529908bfe
+  zh: 04cede19fcbb4149
 /deepseek-ai-dsh-client-ui-brand-private/table-of-contents:
   en: b563e4ec4727d0de
   zh: 44ebe7ceeda3dff6
 /deepseek-ai-dsh-client-ui-brand-private/use-this-package:
   en: 2c6d10a355e1a0cc
   zh: fea5b35d09662bfd
-/deepseek-ai-dsh-client-ui-brand-private/use-this-package/which-builds-receive-the-private-name:
-  en: e79424f7f4d1e6be
-  zh: 9201bbda358be74c
-/deepseek-ai-dsh-client-ui-brand-private/use-this-package/what-the-brand-row-shows:
-  en: e5eec499495d7e92
-  zh: 61554324884a1b4f
+/deepseek-ai-dsh-client-ui-brand-private/use-this-package/which-builds-receive-the-private-brand:
+  en: bdae1bdcbde13388
+  zh: 42e4390fe5a45772
+/deepseek-ai-dsh-client-ui-brand-private/use-this-package/what-the-brand-shows:
+  en: 3fafddcc9eb2b0b6
+  zh: f79769078b39ca2e
 /deepseek-ai-dsh-client-ui-brand-private/understand-the-implementation:
-  en: f3799d3be43a10b2
-  zh: 8f61b0563b64b1a5
+  en: 8a7c322087a055b1
+  zh: a1a364b8506ba6df
 /deepseek-ai-dsh-client-ui-brand-private/further-exploration:
-  en: d00510d24e870233
-  zh: e73f3cbbcfe79bff
+  en: 183ba92604e116d5
+  zh: 01ad8b43a0f0f516
 /deepseek-ai-dsh-client-ui-brand-private/model-experience:
   en: 618008c7641070e7
   zh: 7872ee35d3839799
@@ -36,8 +36,8 @@
   en: ca75c51c89c2c9b0
   zh: 6592684e02dd100f
 /deepseek-ai-dsh-client-ui-brand-private/known-limitations-and-deferred-work:
-  en: 379b2e22e07ac95c
-  zh: 86d53c294e21ff27
+  en: 40a6b33c6b99a459
+  zh: 3619195cbaeb413c
 /deepseek-ai-dsh-client-ui-brand-private/known-limitations-and-deferred-work/dev-note:
-  en: e67f633dc6fe7773
-  zh: eaf61d2195d5f77f
+  en: 5728f46a8beb27c1
+  zh: edbdc9e0d9d6c846
