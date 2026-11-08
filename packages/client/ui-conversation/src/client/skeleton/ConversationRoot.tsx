@@ -1,13 +1,16 @@
-// Resident conversation skeleton. Hero chrome, composer positioning, the
-// chain, AND the composer bar (session-maybe slot) stay mounted across
-// no-session/session transitions — the bar renders inert via owner props.
+// Resident conversation seat. The window composition itself is public, so the
+// main panel and an embedded host render the same header and body.
 
 import type { ConversationSlotProps } from '../contract/slots.ts'
-import { ConversationMainPanel } from './ConversationMainPanel.tsx'
 
-/** Full props composed from the slot contract. */
+/** Full props composed from the main Conversation slot contract. */
 export type ConversationRootProps = ConversationSlotProps
 
-export function ConversationRoot(props: ConversationRootProps) {
-  return <ConversationMainPanel {...props} />
+/**
+ * Render the resident Conversation window.
+ * @param props - main-slot inputs and the Factory renderer.
+ * @returns the main-variant window occurrence.
+ */
+export function ConversationRoot({ renderFactorySlot }: ConversationRootProps) {
+  return <>{renderFactorySlot('conversation.window', { variant: 'main' })}</>
 }

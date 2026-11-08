@@ -41,6 +41,7 @@ import { ConversationContent } from './skeleton/ConversationContent.tsx'
 import { ConversationPanel } from './skeleton/ConversationPanel.tsx'
 import { ConversationHeader } from './skeleton/ConversationHeader.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
+import { ConversationWindow } from './skeleton/ConversationWindow.tsx'
 import { InputBar } from './skeleton/InputBar.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { installStopShortcut } from './stop-shortcut.ts'
@@ -334,10 +335,17 @@ export function apply(ctx: Context, config: Config = Config({})): void {
 
   const registerConversationRoot = () => slots.register({
     name: 'main.conversation',
+  }, ConversationRoot)
+
+  // The window owns the header declaration so any host can render the whole
+  // window; the main panel only calls the Factory.
+  const registerConversationWindow = () => slots.registerFactory({
+    name: 'conversation.window',
+    scope: 'session-maybe',
     children: {
       'conversation.header': { kind: 'single', scope: 'session-maybe' },
     },
-  }, ConversationRoot)
+  }, ConversationWindow)
 
   const registerConversationContent = () => slots.registerFactory({
     name: 'conversation.content',
@@ -584,6 +592,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     }, ConversationPanel)
     yield registerConversationRoot()
     yield registerConversationContent()
+    yield registerConversationWindow()
     yield registerConversationSession()
     yield registerHeader()
     yield registerSessionHeader()

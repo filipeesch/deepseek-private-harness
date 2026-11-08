@@ -82,7 +82,7 @@ Runtime checks cover dynamically assembled and plain-JavaScript callers: duplica
 
 **Reuse an ordinary Slot as a portable definition.** An ordinary Slot belongs to one parent declaration and one position in the global tree. Reusing it elsewhere would borrow the wrong ownership and lifetime.
 
-**Move the main Conversation Header into the Factory.** Only the main host renders that Header. Keeping it outside the Factory lets embedded occurrences omit it without another local selection and preserves its existing strict-Session Slot lifecycle.
+**Move the main Conversation Header into the Factory.** Only the main host renders that Header. Keeping it outside the Factory lets embedded occurrences omit it without another local selection and preserves its existing strict-Session Slot lifecycle. *Reversed by [the conversation window Factory](2026-11-08-conversation-window-factory.md): a host outside the main panel needs the same header, so the window declares it and the main panel calls the window.*
 
 **Move the shared Conversation store onto the optional-Session Factory.** The Header and Session body share one strict-Session handle. Mounting that handle on both the `session-maybe` Factory and the `session` Header would violate the one-handle-one-scope rule.
 

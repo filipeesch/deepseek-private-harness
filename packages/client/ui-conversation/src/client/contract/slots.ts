@@ -233,8 +233,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'session'
       owner: { view?: string }
     }
-    /** Resident navigation container, including when no Session is selected. */
-    'conversation.header': { kind: 'single'; scope: 'session-maybe' }
+    /** Conversation header, rendered by the window with the chrome the occurrence asked for. */
+    'conversation.header': { kind: 'single'; scope: 'session-maybe'; owner: ConversationHeaderOwnerProps }
     /** Strict per-Session title, actions, and View navigation. */
     'conversation.session.header': {
       kind: 'single'
@@ -385,6 +385,20 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         widthControls: { scope: 'root'; props: ConversationWidthControlsInputProps }
       }
     }
+    /**
+     * The whole native Conversation window: its Session header and its body.
+     * A host renders one occurrence wherever it wants the window, and supplies
+     * the Session area around it — an occurrence never takes a Session
+     * identity. Every header extension point is global, so a contribution
+     * registered once reaches the main panel and every embedded occurrence.
+     */
+    'conversation.window': {
+      scope: 'session-maybe'
+      props: ConversationWindowInputProps
+      children: {
+        'conversation.header': { kind: 'single'; scope: 'session-maybe' }
+      }
+    }
   }
 
   interface GlobalStandardProps {
@@ -415,6 +429,19 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export interface HeroAgentPresetOwnerProps {
   /** Marker field: the occupant owns its roster and staged selection. */
   children?: never
+}
+
+/**
+ * Owner share of the Conversation header.
+ */
+export interface ConversationHeaderOwnerProps {
+  /**
+   * Chrome variant of this render. `main` renders the resident header row: the
+   * leading global-navigation seat, the window-drag marker, and the main
+   * column's geometry. `embedded` renders the Session header alone, for a host
+   * surface that already owns its own chrome.
+   */
+  readonly variant: 'main' | 'embedded'
 }
 
 /** Header actions derive their state from standard Session props. */
@@ -645,10 +672,9 @@ export interface HeroBrandMarkOwnerProps {
   className?: string | undefined
 }
 
-/** Full props of the resident optional-Session Conversation shell. */
+/** Full props of the resident optional-Session Conversation seat. */
 export type ConversationSlotProps =
   PropsRuntime<'main.conversation'>
-  & PropsRenderSlots<'conversation.header'>
   & PropsRenderFactories
 
 /** Inputs shared by main and embedded Conversation content occurrences. */
@@ -656,6 +682,12 @@ export interface ConversationContentInputProps {
   variant: 'main' | 'embedded'
   phase: 'settling' | 'hero' | 'active'
   hero: boolean
+}
+
+/** Inputs of one Conversation window occurrence. */
+export interface ConversationWindowInputProps {
+  /** `main` renders the resident panel; `embedded` renders the same window without application chrome. */
+  readonly variant: 'main' | 'embedded'
 }
 
 /** Values passed from shared content to its occurrence-selected width controls. */
@@ -668,6 +700,9 @@ export interface ConversationWidthControlsInputProps {
 
 /** Full props of the reusable Conversation Factory definition. */
 export type ConversationContentProps = FactoryComponentPropsOf<'conversation.content'>
+
+/** Full props of the reusable Conversation window definition. */
+export type ConversationWindowProps = FactoryComponentPropsOf<'conversation.window'>
 
 /** Shared target-neutral Conversation store handle. */
 export type ConversationStore = ReturnType<typeof createConversationStore>

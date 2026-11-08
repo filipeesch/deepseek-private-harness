@@ -1,17 +1,26 @@
-import type { ConversationSlotProps } from '../contract/slots.ts'
+/** The whole Conversation window: its Session header and its body. */
+import type { ConversationWindowProps } from '../contract/slots.ts'
 import { conversationPhase } from '../contract/snapshot.ts'
 import { ConversationWidthControls } from './ConversationWidthControls.tsx'
 import css from './ConversationRoot.module.css'
 
-const CONTENT_SLOTS = { widthControls: ConversationWidthControls }
+/**
+ * Transcript resize handles are resident-panel chrome: an embedded occurrence
+ * is sized by the panel it lives in, so it selects no width controls.
+ */
+const MAIN_CONTENT_SLOTS = { widthControls: ConversationWidthControls }
 
 /**
- * Render the existing main Conversation frame around the extracted content.
- * @param props - the original `main.conversation` Slot props.
- * @returns the unchanged root, Header, content, and width-control subtree.
+ * Render one Conversation window occurrence for the Session bound at this
+ * render position.
+ * @param props - occurrence variant, standard Session sources, the declared
+ * Conversation header seat, and the Factory renderer.
+ * @returns the window root carrying its header and its body.
  */
-export function ConversationMainPanel(props: ConversationSlotProps) {
-  const { sessionId, useSession, useSessions, useConversation, renderSlot, renderFactorySlot } = props
+export function ConversationWindow(props: ConversationWindowProps) {
+  const {
+    variant, sessionId, useSession, useSessions, useConversation, renderSlot, renderFactorySlot,
+  } = props
   const session = useSession(s => s)
   const conversation = useConversation(s => s)
   const shellPhase = session === undefined || conversation === undefined
@@ -36,14 +45,12 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
 
   return (
     <div className={css.root} data-phase={phase}>
-      {renderSlot('conversation.header', {})}
-      {renderFactorySlot('conversation.content', {
-        variant: 'main',
-        phase,
-        hero,
-      }, {
-        slots: CONTENT_SLOTS,
-      })}
+      {renderSlot('conversation.header', { variant })}
+      {renderFactorySlot(
+        'conversation.content',
+        { variant, phase, hero },
+        variant === 'main' ? { slots: MAIN_CONTENT_SLOTS } : undefined,
+      )}
     </div>
   )
 }
