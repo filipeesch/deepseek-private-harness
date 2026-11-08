@@ -34,10 +34,9 @@ export const ARTWORK_PATHS = {
   output: fileURLToPath(new URL('../installer/assets/', import.meta.url)),
 } as const
 
-/** The whale knock-out and the shield path, extracted from the committed tile. */
+/** The mark path, extracted from the committed tile. */
 export interface MarkGeometry {
-  readonly mask: string
-  readonly shield: string
+  readonly path: string
 }
 
 /**
@@ -46,10 +45,14 @@ export interface MarkGeometry {
  * @returns the mask element and the shield path, both in the mark's own 24-unit space.
  */
 export function markGeometry(tile: string): MarkGeometry {
-  const mask = /<mask id="private-mark-whale"[\s\S]*?<\/mask>/u.exec(tile)?.[0]
-  const shield = /<path d="([^"]+)" fill="#FFFFFF" mask="url\(#private-mark-whale\)"\/>/u.exec(tile)?.[1]
-  if (mask === undefined || shield === undefined) throw new Error('brand artwork: the tile carries no private mark')
-  return { mask, shield }
+  const path = /<path d="([^"]+)" fill="#FFFFFF" fill-rule="evenodd"/u.exec(tile)?.[1]
+  if (path === undefined) throw new Error('brand artwork: the tile carries no private mark')
+  return { path }
+}
+
+/** Render the mark as one even-odd path in the requested ink. */
+function markSvg(geometry: MarkGeometry, ink: string, size: number): string {
+  return `<svg width="${String(size)}" height="${String(size)}" viewBox="0 0 24 24" fill="none"><path d="${geometry.path}" fill="${ink}" fill-rule="evenodd"/></svg>`
 }
 
 /**
@@ -68,7 +71,7 @@ export function lockupDocument(geometry: MarkGeometry, ink: string, font: string
   .name { font-family: 'Montserrat', sans-serif; font-weight: 500; font-size: ${String(LOCKUP_NAME)}px; letter-spacing: 0.012em; line-height: 1; color: ${ink}; }
 </style></head><body>
   <div class="lockup">
-    <svg width="${String(LOCKUP_MARK)}" height="${String(LOCKUP_MARK)}" viewBox="0 0 24 24" fill="none">${geometry.mask}<path d="${geometry.shield}" fill="${ink}" mask="url(#private-mark-whale)"/></svg>
+    ${markSvg(geometry, ink, LOCKUP_MARK)}
     <span class="name">Private DSH</span>
   </div>
 </body></html>`
@@ -88,7 +91,7 @@ export function uninstallerDocument(geometry: MarkGeometry): string {
     display: flex; align-items: center; justify-content: center; }
 </style></head><body>
   <div class="tile">
-    <svg width="${String(Math.round(UNINSTALLER_TILE * 0.62))}" height="${String(Math.round(UNINSTALLER_TILE * 0.62))}" viewBox="0 0 24 24" fill="none">${geometry.mask}<path d="${geometry.shield}" fill="#FFFFFF" mask="url(#private-mark-whale)"/></svg>
+    ${markSvg(geometry, '#FFFFFF', Math.round(UNINSTALLER_TILE * 0.62))}
   </div>
 </body></html>`
 }

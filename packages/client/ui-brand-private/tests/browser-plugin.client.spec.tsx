@@ -21,6 +21,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { apply as sidebarApply, inject as sidebarInject } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject } from '../src/client/index.ts'
+import { MARK_PATH } from '../src/client/mark.ts'
 import { apply as hostApply } from '../src/index.ts'
 
 /** Seats this package occupies. */
@@ -275,15 +276,12 @@ describe('private browser-brand plugin', () => {
     if (svg === null) throw new Error('mark svg missing')
     expect(svg.getAttribute('width')).toBe('24')
     expect(svg.getAttribute('fill')).toBe('none')
-    const mask = svg.querySelector('mask')
-    if (mask === null) throw new Error('mark mask missing')
-    const shield = svg.querySelector('path[mask]')
-    if (shield === null) throw new Error('shield path missing')
-    expect(shield.getAttribute('fill')).toBe('currentColor')
-    // The whale is a hole: the only filled whale path lives inside the mask.
-    const whale = mask.querySelector('path')
-    if (whale === null) throw new Error('whale path missing')
-    expect(whale.getAttribute('fill')).toBe('black')
+    const mark = svg.querySelector('path')
+    if (mark === null) throw new Error('mark path missing')
+    // The whale is a hole in the same path, so the mark carries the theme ink once.
+    expect(mark.getAttribute('fill')).toBe('currentColor')
+    expect(mark.getAttribute('fill-rule')).toBe('evenodd')
+    expect(mark.getAttribute('d')).toBe(MARK_PATH)
     await runtime.dispose()
   })
 

@@ -1,13 +1,12 @@
 /**
  * Keeps the committed artwork on the mark's own geometry. The static sources
- * repeat the shield and the whale so the icons, the tray, and the installer
- * lockup stay independent of the browser bundle; this test fails when one of
- * them drifts from the component's constants.
+ * repeat the mark so the icons, the tray, and the installer lockup stay
+ * independent of the browser bundle; this test fails when one of them drifts
+ * from the component's constant.
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { FISH_LOGO_PATH } from '@deepseek-ai/dsh-client-ui-primitives'
-import { MARK_SHIELD_PATH } from '../src/client/mark.ts'
+import { MARK_PATH } from '../src/client/mark.ts'
 
 /** Committed artwork that must carry the mark's geometry. */
 const SOURCES = [
@@ -19,13 +18,9 @@ const SOURCES = [
 ] as const
 
 describe('committed brand artwork', () => {
-  const read = (relative: string): string => readFileSync(new URL(relative, import.meta.url), 'utf8')
-
-  it.each(SOURCES)('%s carries the shield and the whale knock-out', (_name, relative) => {
-    const source = read(relative)
-    expect(source).toContain(MARK_SHIELD_PATH)
-    expect(source).toContain(FISH_LOGO_PATH)
-    // The whale is a hole in the shield, never a fill of its own.
-    expect(source).toContain('mask="url(#private-mark-whale)"')
+  it.each(SOURCES)('%s carries the mark as one even-odd path', (_name, relative) => {
+    const source = readFileSync(new URL(relative, import.meta.url), 'utf8')
+    expect(source).toContain(MARK_PATH)
+    expect(source).toContain('fill-rule="evenodd"')
   })
 })
